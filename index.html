@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abasolutely Marketplace — Operations Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --bg: #14140f; --surface: #1c1c15; --surface-2: #24241b; --border: #34342a;
+    --text: #f2ede1; --text-muted: #a39d8c;
+    --amber: #e8963c; --amber-dim: #4a3a22;
+    --green: #6bab6a; --green-dim: #24361f;
+    --red: #d1596b; --red-dim: #3a1f24;
+    --gold: #d4af5a; --radius: 10px;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
+  h1,h2,h3{ font-family:'Fraunces',serif; margin:0; }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+  #app{ display:flex; min-height:100vh; }
+
+  #sidebar{ width:250px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); padding:22px 16px; display:flex; flex-direction:column; }
+  .brand{ display:flex; align-items:center; gap:10px; padding:0 6px 22px; border-bottom:1px solid var(--border); margin-bottom:18px; }
+  .brand-mark{ width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg,var(--amber),var(--gold)); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .brand-name{ font-family:'Fraunces',serif; font-weight:600; font-size:16px; line-height:1.2; }
+  .brand-sub{ font-size:11px; color:var(--text-muted); letter-spacing:.04em; text-transform:uppercase; }
+  nav{ display:flex; flex-direction:column; gap:2px; flex:1; overflow-y:auto; }
+  .nav-item{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; color:var(--text-muted); cursor:pointer; font-size:13.5px; font-weight:500; transition:.15s; user-select:none; }
+  .nav-item:hover{ background:var(--surface-2); color:var(--text); }
+  .nav-item.active{ background:var(--amber-dim); color:var(--amber); }
+  .nav-icon{ width:18px; text-align:center; }
+  .nav-divider{ font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); padding:14px 12px 4px; }
+  .sidebar-foot{ font-size:11px; color:var(--text-muted); padding:10px 6px 0; border-top:1px solid var(--border); margin-top:12px; }
+  .conn-dot{ display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; background:var(--gold); }
+
+  #main{ flex:1; padding:28px 34px; max-width:1400px; }
+  .page{ display:none; animation:fade .2s ease; }
+  .page.active{ display:block; }
+  @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+  .page-head{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:22px; flex-wrap:wrap; gap:12px; }
+  .page-head h1{ font-size:26px; font-weight:600; }
+  .page-head .sub{ color:var(--text-muted); font-size:13px; margin-top:4px; }
+
+  .btn{ background:var(--amber); color:#1c1305; border:none; padding:10px 16px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:.15s; }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn.secondary{ background:var(--surface-2); color:var(--text); border:1px solid var(--border); }
+  .btn.danger{ background:var(--red-dim); color:var(--red); border:1px solid var(--red); }
+  .btn.small{ padding:6px 10px; font-size:12px; }
+
+  .grid{ display:grid; gap:16px; }
+  .grid-stats{ grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); margin-bottom:20px; }
+  .grid-3{ grid-template-columns:repeat(3,1fr); }
+  @media(max-width:900px){ .grid-3{ grid-template-columns:1fr; } }
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; }
+  .stat-label{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:8px; }
+  .stat-value{ font-family:'Fraunces',serif; font-size:26px; font-weight:600; }
+  .stat-value.green{ color:var(--green); } .stat-value.red{ color:var(--red); } .stat-value.amber{ color:var(--amber); }
+
+  .two-col{ display:grid; grid-template-columns:1.6fr 1fr; gap:16px; align-items:start; }
+  @media(max-width:1000px){ .two-col{ grid-template-columns:1fr; } }
+  .two-col-rev{ display:grid; grid-template-columns:340px 1fr; gap:16px; align-items:start; }
+  @media(max-width:1000px){ .two-col-rev{ grid-template-columns:1fr; } }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; padding:10px 12px; color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid var(--border); }
+  td{ padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:last-child td{ border-bottom:none; }
+  .table-wrap{ overflow-x:auto; }
+  .empty-row td{ text-align:center; color:var(--text-muted); padding:30px; }
+
+  .badge{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+  .badge.red{ background:var(--red-dim); color:var(--red); }
+  .badge.orange{ background:#3a2c15; color:#e8a33d; }
+  .badge.green{ background:var(--green-dim); color:var(--green); }
+  .badge.gray{ background:var(--surface-2); color:var(--text-muted); }
+
+  .icon-btn{ background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:14px; padding:4px 6px; border-radius:6px; }
+  .icon-btn:hover{ background:var(--surface-2); color:var(--text); }
+
+  .tabbar{ display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .tab{ padding:8px 14px; border-radius:7px; background:var(--surface); border:1px solid var(--border); color:var(--text-muted); font-size:13px; font-weight:500; cursor:pointer; }
+  .tab.active{ background:var(--amber-dim); color:var(--amber); border-color:var(--amber-dim); }
+
+  input, select, textarea{ background:var(--surface-2); border:1px solid var(--border); color:var(--text); padding:9px 11px; border-radius:7px; font-size:13px; font-family:inherit; width:100%; }
+  input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--amber); }
+  input[type=file]{ padding:7px; font-size:12px; }
+  input[type=range]{ padding:0; accent-color:var(--amber); }
+  label{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; display:block; margin-bottom:5px; }
+  .field{ margin-bottom:12px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .flag-hint{ font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
+
+  #modalOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:center; justify-content:center; padding:20px; }
+  #modalOverlay.open{ display:flex; }
+  .modal{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; width:100%; max-width:460px; max-height:88vh; overflow-y:auto; }
+  .modal h3{ font-size:18px; margin-bottom:14px; }
+  .modal-actions{ display:flex; gap:10px; margin-top:18px; justify-content:flex-end; }
+
+  #toast{ position:fixed; bottom:22px; right:22px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); padding:12px 18px; border-radius:8px; font-size:13px; z-index:200; opacity:0; transform:translateY(8px); transition:.25s; max-width:320px; }
+  #toast.show{ opacity:1; transform:translateY(0); }
+
+  /* COSTING */
+  .cost-section-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .cost-row{ display:grid; grid-template-columns:1.6fr 0.6fr 0.8fr auto; gap:8px; margin-bottom:8px; align-items:center; }
+  .cost-row-2{ display:grid; grid-template-columns:1.6fr 0.8fr auto; gap:8px; margin-bottom:8px; align-items:center; }
+  .cost-col-labels{ display:grid; grid-template-columns:1.6fr 0.6fr 0.8fr auto; gap:8px; font-size:10px; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; letter-spacing:.04em; }
+
+  /* RUSH ID */
+  #ridPreviewOuter{ overflow:auto; max-width:100%; display:flex; justify-content:center; }
+  .rid-cell{ overflow:hidden; border:1px dashed #999; background:#111; }
+  .rid-cell img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .rid-group-row{ display:grid; grid-template-columns:0.6fr 0.65fr 0.65fr 0.6fr auto; gap:6px; margin-bottom:8px; align-items:center; }
+
+  @media print{
+    body *{ visibility:hidden; }
+    #ridPageInner, #ridPageInner *, #sgPageInner, #sgPageInner *{ visibility:visible; }
+    #ridPageInner, #sgPageInner{ position:absolute; top:0; left:0; border:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">🧡</div>
+      <div><div class="brand-name">Abasolutely<br>Marketplace</div><div class="brand-sub">Ops Hub</div></div>
+    </div>
+    <nav>
+      <div class="nav-divider" style="padding-top:0;">Main Tab</div>
+      <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="inventory"><span class="nav-icon">📦</span> Inventory</div>
+      <div class="nav-item" data-page="sales"><span class="nav-icon">🧾</span> Sales Log</div>
+      <div class="nav-item" data-page="restock"><span class="nav-icon">🛒</span> Restock Budget</div>
+      <div class="nav-item" data-page="customers"><span class="nav-icon">🤝</span> Customer/CRM</div>
+      <div class="nav-item" data-page="finances"><span class="nav-icon">💰</span> Finances</div>
+      <div class="nav-item" data-page="bir"><span class="nav-icon">🏛️</span> BIR Calculator</div>
+      <div class="nav-divider">Printing Tools</div>
+      <div class="nav-item" data-page="joborders"><span class="nav-icon">📋</span> Job Orders</div>
+      <div class="nav-item" data-page="quotations"><span class="nav-icon">🧾</span> Quotation</div>
+      <div class="nav-item" data-page="costing"><span class="nav-icon">🧮</span> Printing Costing</div>
+      <div class="nav-item" data-page="rushid"><span class="nav-icon">🪪</span> Rush ID Template</div>
+      <div class="nav-item" data-page="stickerguides"><span class="nav-icon">🏷️</span> Sticker Guides</div>
+      <div class="nav-item" data-page="manageproducts"><span class="nav-icon">🗂️</span> Manage Products</div>
+      <div class="nav-item" data-page="printrestock"><span class="nav-icon">🏪</span> Restock</div>
+      <div class="nav-item" data-page="cheatsheet"><span class="nav-icon">📋</span> Cheat Sheet</div>
+      <div class="nav-divider">Settings</div>
+      <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</div>
+    </nav>
+    <div class="sidebar-foot"><span class="conn-dot"></span>Saved locally on this device</div>
+  </div>
+
+  <div id="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-head">
+        <div><h1 id="greeting">Good day! 👋</h1><div class="sub" id="todayDate"></div></div>
+        <button class="btn" onclick="document.querySelector('.nav-item[data-page=sales]').click()">+ Go to Sales Log</button>
+      </div>
+      <div class="grid grid-stats">
+        <div class="card"><div class="stat-label">Today's Sales</div><div class="stat-value amber" id="statToday">₱0</div></div>
+        <div class="card"><div class="stat-label">This Week</div><div class="stat-value" id="statWeek">₱0</div></div>
+        <div class="card"><div class="stat-label">Month Total</div><div class="stat-value" id="statMonth">₱0</div></div>
+        <div class="card"><div class="stat-label">Needs Restock</div><div class="stat-value red" id="statRestock">0</div></div>
+        <div class="card"><div class="stat-label">Top Product (Month)</div><div class="stat-value" id="statTop" style="font-size:16px;">—</div></div>
+      </div>
+      <div class="two-col">
+        <div class="card"><h3 style="margin-bottom:14px; font-size:15px;">Sales — Last 7 Days</h3><canvas id="salesChart" height="90"></canvas></div>
+        <div class="card">
+          <h3 style="margin-bottom:14px; font-size:15px;">Break-Even Status</h3>
+          <div class="stat-label">Daily Target</div>
+          <div class="stat-value" id="dailyTarget" style="font-size:20px; margin-bottom:10px;">₱0</div>
+          <div class="stat-label">Today vs Target</div>
+          <div id="targetStatus" class="badge gray">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVENTORY -->
+    <div class="page" id="page-inventory">
+      <div class="page-head">
+        <div><h1>Inventory</h1><div class="sub">Stock across Food, Toys &amp; Candies, and Others</div></div>
+        <button class="btn" onclick="openProductModal()">+ Add Product</button>
+      </div>
+      <div class="tabbar" id="invTabs">
+        <div class="tab active" data-cat="Food">🍗 Food</div>
+        <div class="tab" data-cat="ToysCandies">🍬 Toys &amp; Candies</div>
+        <div class="tab" data-cat="Others">📎 Others</div>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Product</th><th>Brand</th><th>Stock</th><th>Par</th><th>Restock Cost</th><th>Sell Price</th><th>Profit</th><th>Status</th><th></th></tr></thead>
+          <tbody id="inventoryBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- SALES LOG (matches daily sheet layout) -->
+    <div class="page" id="page-sales">
+      <div class="page-head">
+        <div><h1>Sales Log</h1><div class="sub">Qty · Product · Price · Total · Type · Remarks — same as your daily sheet</div></div>
+        <button class="btn secondary" onclick="openCsvImportModal()">⬆ Import Daily CSV</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <label style="margin:0;">Date</label>
+        <input type="date" id="salesDateFilter" style="max-width:180px;">
+      </div>
+
+      <div class="grid grid-stats" id="salesSummaryStats"></div>
+
+      <div class="two-col">
+        <div class="card" style="padding:0;">
+          <div style="padding:14px 18px;">
+            <h3 style="font-size:14px; margin-bottom:10px;">Quick Add</h3>
+            <div class="rid-group-row" style="grid-template-columns:0.5fr 1.6fr 0.8fr 0.8fr auto;">
+              <input type="number" id="qa_qty" placeholder="Qty" value="1">
+              <input id="qa_product" list="productSuggestions" placeholder="Product">
+              <input type="number" id="qa_price" placeholder="Price" step="any">
+              <input id="qa_type" list="typeSuggestions" placeholder="Type">
+              <button class="btn small" onclick="quickAddSale()">Add</button>
+            </div>
+            <input id="qa_remarks" placeholder="Remarks (optional)">
+            <datalist id="productSuggestions"></datalist>
+            <datalist id="typeSuggestions">
+              <option value="Print"><option value="Stationary"><option value="Toys"><option value="Candy"><option value="Food"><option value="Others">
+            </datalist>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Qty</th><th>Product</th><th>Price</th><th>Total</th><th>Type</th><th>Remarks</th><th></th></tr></thead>
+            <tbody id="salesBody"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:14px; margin-bottom:10px;">💸 Today's Expenses (OPEX)</h3>
+          <div class="field-row">
+            <input id="qa_exp_item" placeholder="Expense item">
+            <input id="qa_exp_amt" type="number" placeholder="Amount" step="any">
+          </div>
+          <button class="btn small secondary" style="margin-top:8px; width:100%; justify-content:center;" onclick="quickAddExpense()">+ Add Expense</button>
+          <div class="table-wrap" style="margin-top:12px;"><table>
+            <thead><tr><th>Item</th><th>Amount</th><th></th></tr></thead>
+            <tbody id="dailyExpensesBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESTOCK -->
+    <div class="page" id="page-restock">
+      <div class="page-head">
+        <div><h1>Restock Planning</h1><div class="sub">Marking "Bought" adds stock back automatically</div></div>
+        <button class="btn" onclick="openRestockModal()">+ Add to Plan</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Product</th><th>Category</th><th>Pcs/Pack</th><th>Cost Price</th><th>Qty Buying</th><th>Total Cost</th><th>Status</th><th></th></tr></thead>
+          <tbody id="restockBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- CUSTOMERS -->
+    <div class="page" id="page-customers">
+      <div class="page-head">
+        <div><h1>Customers</h1><div class="sub">Suki tracking &amp; follow-ups</div></div>
+        <button class="btn" onclick="openCustomerModal()">+ Add Customer</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>Type</th><th>Contact</th><th>Visits</th><th>Avg Spend</th><th>Fav Product</th><th>Discount</th><th>Next Follow-up</th><th></th></tr></thead>
+          <tbody id="customersBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- FINANCES -->
+    <div class="page" id="page-finances">
+      <div class="page-head">
+        <div><h1>Finances</h1><div class="sub">Fixed monthly overhead &amp; daily break-even target</div></div>
+        <button class="btn" onclick="openExpenseModal()">+ Add Expense</button>
+      </div>
+      <div class="grid grid-stats">
+        <div class="card"><div class="stat-label">Monthly Budget</div><div class="stat-value" id="finBudget">₱0</div></div>
+        <div class="card"><div class="stat-label">Monthly Actual</div><div class="stat-value" id="finActual">₱0</div></div>
+        <div class="card"><div class="stat-label">Daily Break-Even</div><div class="stat-value amber" id="finDaily">₱0</div></div>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Category</th><th>Details</th><th>Frequency</th><th>Budget</th><th>Actual</th><th></th></tr></thead>
+          <tbody id="expensesBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- PRINTING COSTING -->
+    <div class="page" id="page-costing">
+      <div class="page-head">
+        <div><h1>Printing Costing</h1><div class="sub">Cost out a print job and find your selling price</div></div>
+        <button class="btn" onclick="saveCosting()">💾 Save Costing</button>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="cost-section-head">
+          <h3 style="font-size:14px;">⚡ Quick Job Setup</h3>
+          <button class="btn small secondary" onclick="document.querySelector('.nav-item[data-page=manageproducts]').click()">🗂 Manage Products</button>
+        </div>
+        <div class="tabbar" id="qjModeTabs">
+          <div class="tab active" data-mode="standard">🖨️ Standard Print Job</div>
+          <div class="tab" data-mode="custom">🧩 Custom / Assembled Item</div>
+        </div>
+
+        <div id="qjStandardPanel">
+          <div class="field">
+            <label>What will you print?</label>
+            <select id="qj_type" onchange="onQuickJobTypeChange()"></select>
+          </div>
+          <div id="qj_cheatHints"></div>
+          <div class="card" style="background:var(--surface-2); margin-bottom:12px; padding:12px 14px;">
+            <div class="cost-col-labels" style="grid-template-columns:1fr 1fr 1fr; margin-bottom:8px;"><span>Paper Cost (₱)</span><span>Ink Cost (₱)</span><span>Op Cost (₱)</span></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+              <input id="qj_paperCost" type="number" step="any" oninput="qjRatesTouched=true;">
+              <input id="qj_inkCost" type="number" step="any" oninput="qjRatesTouched=true;">
+              <input id="qj_opCost" type="number" step="any" oninput="qjRatesTouched=true;">
+            </div>
+            <button class="btn small secondary" style="width:100%; justify-content:center; margin-top:10px;" onclick="qjSaveRatesToProduct()">💾 Save these numbers back to this product</button>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Print Quality</label>
+              <select id="qj_quality"><option value="1" selected>Standard</option><option value="1.4">High</option></select>
+            </div>
+            <div class="field"><label>Quantity / Copies</label><input id="qj_qty" type="number" value="50"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Estimated time per unit (minutes)</label><input id="qj_minutes" type="number" step="any" value="0.2"></div>
+            <div class="field"><label>Labor Rate (₱/hr)</label><input id="qj_rate" type="number" value="90"></div>
+          </div>
+          <button class="btn" style="width:100%; justify-content:center;" onclick="applyQuickJob()">Apply to Costing ↓</button>
+          <div class="flag-hint">Starter estimates — swap in your real supplier prices once you know them. "High" quality mainly matters for Photo Print/Rush ID.</div>
+        </div>
+
+        <div id="qjCustomPanel" style="display:none;">
+          <div class="field"><label>Product Name</label><input id="qjc_name" placeholder="e.g. Spotify Keychain"></div>
+          <div class="cost-section-head"><h3 style="font-size:13px;">Components</h3><button class="icon-btn" onclick="addQjComponent()">➕</button></div>
+          <div class="cost-col-labels" style="grid-template-columns:1.6fr 0.8fr auto;"><span>Component</span><span>Cost / unit (₱)</span><span></span></div>
+          <div id="qjComponentsList"></div>
+          <button class="btn small secondary" style="margin:4px 0 14px;" onclick="openComponentFromCatalog()">+ Add Print/Paper Component from Catalog</button>
+          <div class="field-row">
+            <div class="field"><label>Electricity / Operation Cost (₱ per unit)</label><input id="qjc_op" type="number" step="any" value="1"></div>
+            <div class="field"><label>Quantity</label><input id="qjc_qty" type="number" value="1"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Labor time per unit (minutes)</label><input id="qjc_minutes" type="number" step="any" value="3"></div>
+            <div class="field"><label>Labor Rate (₱/hr)</label><input id="qjc_rate" type="number" value="90"></div>
+          </div>
+          <button class="btn" style="width:100%; justify-content:center;" onclick="applyCustomJob()">Apply to Costing ↓</button>
+          <div class="flag-hint">For assembled products (keychains, trinkets, custom souvenirs) with several separate cost pieces — each component becomes its own material row below, so nothing gets missed.</div>
+        </div>
+      </div>
+
+      <div class="field-row" style="margin-bottom:16px; max-width:520px;">
+        <div class="field"><label>Product Name</label><input id="costProductName" placeholder="e.g. Sticker Sheet"></div>
+        <div class="field"><label>Size</label><input id="costSize" placeholder="e.g. A4"></div>
+      </div>
+
+      <div class="grid grid-3" style="align-items:start;">
+        <div class="card">
+          <div class="cost-section-head"><h3 style="font-size:14px;">📦 Material Cost</h3><button class="icon-btn" onclick="addMaterial()">➕</button></div>
+          <div class="cost-col-labels"><span>Item</span><span>Qty</span><span>Price</span><span></span></div>
+          <div id="matRows"></div>
+          <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); margin-top:8px; padding-top:10px; font-weight:600;">
+            <span>Total Material</span><span id="matTotal">₱0</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="cost-section-head"><h3 style="font-size:14px;">⚙️ Operation Cost</h3><button class="icon-btn" onclick="addOperation()">➕</button></div>
+          <div id="opRows"></div>
+          <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); margin-top:8px; padding-top:10px; font-weight:600;">
+            <span>Total Operation</span><span id="opTotal">₱0</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:14px; margin-bottom:10px;">🧍 Labor Cost</h3>
+          <div class="field"><label>Rate / hr (₱)</label><input type="number" id="laborRate" oninput="updateLabor('rate',this.value)"></div>
+          <div class="field-row">
+            <div class="field"><label>Hours</label><input type="number" id="laborHours" oninput="updateLabor('hours',this.value)"></div>
+            <div class="field"><label>Minutes</label><input type="number" id="laborMinutes" oninput="updateLabor('minutes',this.value)"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); margin-top:8px; padding-top:10px; font-weight:600;">
+            <span>Labor Total</span><span id="laborTotal">₱0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px; background:var(--green-dim); border-color:var(--green);">
+        <div class="stat-label">Total Base Cost</div>
+        <div class="stat-value green" id="baseCost" style="font-size:30px;">₱0</div>
+      </div>
+
+      <div class="two-col" style="margin-top:16px;">
+        <div class="card">
+          <h3 style="font-size:14px; margin-bottom:10px;">📈 Margin Matrix</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Base Cost</th><th>Margin</th><th>Profit</th><th>Selling Price</th></tr></thead>
+            <tbody id="marginMatrix"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:14px; margin-bottom:10px;">🎯 Target Selling Price</h3>
+          <div class="field"><label>Margin: <span id="marginLabel">50%</span></label>
+            <input type="range" id="marginSlider" min="0" max="200" value="50" oninput="updateMargin(this.value)">
+          </div>
+          <div class="stat-value amber" id="targetPrice" style="font-size:34px; text-align:center; margin:14px 0;">₱0</div>
+          <hr style="border-color:var(--border); margin:14px 0;">
+          <h3 style="font-size:13px; margin-bottom:10px;">🏷️ Bulk Order</h3>
+          <div class="stat-label">Base Price</div><div class="mono" id="bulkBase" style="margin-bottom:8px;">₱0</div>
+          <div class="field-row">
+            <div class="field"><label>Discount (₱)</label><input type="number" id="bulkDiscount" value="0" oninput="renderCostingSummary()"></div>
+            <div class="field"><label>Quantity</label><input type="number" id="bulkQty" value="1" oninput="renderCostingSummary()"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); margin-top:4px; padding-top:10px; font-weight:700; font-size:16px;">
+            <span>Final Total</span><span id="bulkFinal" class="amber">₱0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px; padding:0;">
+        <div style="padding:14px 18px 0;"><h3 style="font-size:14px;">Saved Costings</h3></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Product</th><th>Size</th><th>Base Cost</th><th>Target Price</th><th></th></tr></thead>
+          <tbody id="costingsBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- MANAGE PRODUCTS (the printing services database) -->
+    <div class="page" id="page-manageproducts">
+      <div class="page-head">
+        <div><h1>Manage Products</h1><div class="sub">Your printing services database — this feeds the Quick Job Setup picker on Printing Costing</div></div>
+        <button class="btn" onclick="openProductTemplateModal()">+ Add Product</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Category</th><th>Product</th><th>Paper</th><th>Ink</th><th>Op</th><th>Minutes</th><th></th></tr></thead>
+          <tbody id="printProductsBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- QUOTATIONS -->
+    <div class="page" id="page-quotations">
+      <div id="quoteListView">
+        <div class="page-head">
+          <div><h1>Quotations</h1><div class="sub">Create official quotes, export as an image, or convert straight to a job order</div></div>
+          <button class="btn" onclick="openQuoteBuilder()">+ New Quotation</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Quote No.</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead>
+            <tbody id="quotationsBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div id="quoteBuilderView" style="display:none;">
+        <div class="page-head">
+          <div><h1 id="qbTitle">New Quotation</h1><div class="sub">Fill in the details, then finalize to generate the customer-facing card</div></div>
+          <button class="btn secondary" onclick="backToQuoteList()">← Back to List</button>
+        </div>
+        <div class="card" style="max-width:680px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; flex-wrap:wrap; gap:10px;">
+            <div>
+              <h3 style="font-size:20px;">OFFICIAL QUOTATION</h3>
+              <div class="mono" style="color:var(--amber); font-weight:600;" id="qbQuoteNo"></div>
+            </div>
+            <div style="text-align:right; font-size:11px; color:var(--text-muted);">DATE PREPARED<br><span id="qbDate" style="color:var(--text); font-weight:600; font-size:13px;"></span></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Customer Name</label><input id="qb_customer" placeholder="e.g. Sean"></div>
+            <div class="field"><label>Company / Business (optional)</label><input id="qb_company"></div>
+          </div>
+          <div class="field"><label>Prepared By</label><input id="qb_preparedby" placeholder="Staff name"></div>
+
+          <h3 style="font-size:14px; margin:18px 0 10px;">Itemized Breakdown</h3>
+          <div id="qbItemsList"></div>
+          <div class="cost-row" style="grid-template-columns:1.6fr 0.6fr 0.8fr auto; margin-top:8px;">
+            <input id="qb_new_desc" list="printProductSuggestions" placeholder="Description">
+            <input id="qb_new_qty" type="number" value="1" placeholder="Qty">
+            <input id="qb_new_price" type="number" step="any" placeholder="₱ / Unit">
+            <button class="icon-btn" onclick="addQuoteItem()">➕</button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--amber-dim); border-radius:8px; padding:14px 16px; margin-top:18px;">
+            <span style="font-weight:700;">GRAND TOTAL</span>
+            <span class="stat-value amber" id="qbGrandTotal" style="font-size:24px;">₱0</span>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:16px;">
+            <button class="btn secondary" style="flex:1; justify-content:center;" onclick="saveQuoteDraft()">💾 Save Draft</button>
+            <button class="btn" style="flex:1; justify-content:center;" onclick="finalizeQuotation()">🖼 Finalize &amp; View Formal Card</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOB ORDERS -->
+    <div class="page" id="page-joborders">
+      <div id="joListView">
+        <div class="page-head">
+          <div><h1>Job Orders</h1><div class="sub">Manage your active print production queue</div></div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn secondary" onclick="exportJobOrdersCsv()">⬇ Export CSV</button>
+            <button class="btn" onclick="openJobOrderBuilder()">+ New Job Order</button>
+          </div>
+        </div>
+        <div class="grid grid-stats">
+          <div class="card"><div class="stat-label">Pending</div><div class="stat-value amber" id="joStatPending">0</div></div>
+          <div class="card"><div class="stat-label">In Progress</div><div class="stat-value" id="joStatProgress">0</div></div>
+          <div class="card"><div class="stat-label">Done</div><div class="stat-value green" id="joStatDone">0</div></div>
+          <div class="card"><div class="stat-label">To Collect</div><div class="stat-value red" id="joStatCollect">₱0</div></div>
+        </div>
+        <div class="card" style="margin-bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <input id="joSearch" placeholder="Search order # or customer..." style="max-width:260px;" oninput="renderJobOrdersList()">
+          <div class="tabbar" id="joFilterTabs" style="margin-bottom:0;">
+            <div class="tab active" data-filter="All">All</div>
+            <div class="tab" data-filter="Pending">Pending</div>
+            <div class="tab" data-filter="In Progress">In Progress</div>
+            <div class="tab" data-filter="Done">Done</div>
+            <div class="tab" data-filter="Rush">Rush Only</div>
+            <div class="tab" data-filter="Unpaid">Unpaid</div>
+          </div>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Order ID &amp; Client</th><th>Manifest</th><th>Due</th><th>Status</th><th>Valuation</th><th></th></tr></thead>
+            <tbody id="jobOrdersBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div id="joBuilderView" style="display:none;">
+        <div class="page-head">
+          <div><h1 id="joTitle">New Job Order</h1><div class="sub">Configure job and production details</div></div>
+          <button class="btn secondary" onclick="backToJoList()">← Back to List</button>
+        </div>
+        <div class="two-col">
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="field-row">
+                <div class="field"><label>Job #</label><input id="jo_orderno" disabled></div>
+                <div class="field"><label>Due Date</label><input type="date" id="jo_duedate"></div>
+              </div>
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--red); text-transform:none; cursor:pointer; margin-top:6px;">
+                <input type="checkbox" id="jo_rush" style="width:auto;"> Flag as RUSH ORDER
+              </label>
+            </div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:13px; margin-bottom:10px;">Customer Info</h3>
+              <div class="field"><label>Customer Name *</label><input id="jo_customer" placeholder="e.g. Juan Dela Cruz"></div>
+              <div class="field"><label>Phone Number</label><input id="jo_phone" placeholder="09XX..."></div>
+              <div class="field-row">
+                <div class="field"><label>Address</label><input id="jo_address" placeholder="Unit, Street, City..."></div>
+                <div class="field"><label>Socials</label><input id="jo_socials" placeholder="FB, Messenger, IG..."></div>
+              </div>
+            </div>
+            <div class="card">
+              <h3 style="font-size:13px; margin-bottom:10px;">Job Items</h3>
+              <div id="joItemsList"></div>
+              <div class="cost-row" style="grid-template-columns:1.6fr 0.7fr 0.5fr auto; margin-top:8px;">
+                <input id="jo_new_desc" list="printProductSuggestions" placeholder="Item / Product">
+                <input id="jo_new_price" type="number" step="any" placeholder="Price">
+                <input id="jo_new_qty" type="number" value="1" placeholder="Qty">
+                <button class="icon-btn" onclick="addJoItem()">➕</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:13px; margin-bottom:10px;">Pricing &amp; Payment</h3>
+              <div class="field-row">
+                <div class="field"><label>Production Status</label><select id="jo_prodstatus"><option>Pending</option><option>In Progress</option><option>Done</option></select></div>
+                <div class="field"><label>Payment Status</label><select id="jo_paystatus"><option>Unpaid</option><option>Paid</option></select></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>Method</label><select id="jo_method"><option>Cash</option><option>GCash</option><option>Bank Transfer</option><option>Other</option></select></div>
+                <div class="field"><label>Amount Paid (₱)</label><input id="jo_amountpaid" type="number" value="0"></div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:13px; margin-bottom:10px;">Delivery</h3>
+              <div class="tabbar" id="joDeliveryTabs">
+                <div class="tab active" data-val="Pickup">📦 Pick Up</div>
+                <div class="tab" data-val="Delivery">🚚 Delivery</div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:13px; margin-bottom:10px;">Internal Notes</h3>
+              <textarea id="jo_notes" rows="4" placeholder="Your shop's internal notes..."></textarea>
+            </div>
+            <div class="card" style="background:var(--amber-dim);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700;">Total Valuation</span>
+                <span class="stat-value amber" id="joTotalValuation" style="font-size:22px;">₱0</span>
+              </div>
+            </div>
+            <button class="btn" style="width:100%; justify-content:center; margin-top:16px; padding:14px;" id="joSaveBtn" onclick="saveJobOrder()">Create Job Order</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <datalist id="printProductSuggestions"></datalist>
+
+    <!-- RUSH ID -->
+    <div class="page" id="page-rushid">
+      <div class="page-head">
+        <div><h1>Rush ID Template</h1><div class="sub">Pick a package, or build a custom mixed-size layout</div></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" onclick="exportRushIdPng()">⬇ Export PNG</button>
+          <button class="btn" onclick="window.print()">🖨 Print</button>
+        </div>
+      </div>
+      <div class="two-col-rev">
+        <div>
+          <div class="card" style="margin-bottom:14px;">
+            <label>Upload Photo</label>
+            <input type="file" id="ridPhotoInput" accept="image/*" onchange="onRidPhotoUpload(event)">
+            <div class="flag-hint">One photo repeats across every slot in the layout.</div>
+          </div>
+          <div class="card" style="margin-bottom:14px;">
+            <h3 style="font-size:13px; margin-bottom:10px;">Packages</h3>
+            <div class="tabbar" id="ridPresets">
+              <div class="tab" data-preset="pkg1">Pkg 1 — 12× 1×1" (4R)</div>
+              <div class="tab" data-preset="pkg2">Pkg 2 — 2× 2×2" + 4× 1×1" (4R)</div>
+              <div class="tab" data-preset="pkg3">Pkg 3 — 2× 2×2" + 8× 1×1" (5R)</div>
+              <div class="tab" data-preset="pkg4">Pkg 4 — 6× 2×2" (5R)</div>
+              <div class="tab" data-preset="pkg5">Pkg 5 — 4× 2×2" + 8× 1×1" (5R)</div>
+              <div class="tab" data-preset="pkg6">Pkg 6 — 9× Passport (5R)</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="font-size:13px; margin-bottom:10px;">Paper &amp; Spacing</h3>
+            <div class="field-row">
+              <div class="field"><label>Paper</label>
+                <select id="ridPaper" onchange="onRidPaperChange()">
+                  <option value="4x6">4R (4×6 in)</option>
+                  <option value="5x7">5R (5×7 in)</option>
+                  <option value="8.5x11">Letter (8.5×11 in)</option>
+                  <option value="8.27x11.69">A4 (8.27×11.69 in)</option>
+                </select>
+              </div>
+              <div class="field"><label>Margin (in)</label><input type="number" step="0.02" id="ridMargin" value="0.12" oninput="onRidSpacingChange()"></div>
+            </div>
+            <div class="field"><label>Gap between photos (in)</label><input type="number" step="0.02" id="ridGap" value="0.05" oninput="onRidSpacingChange()"></div>
+
+            <div class="cost-section-head" style="margin-top:14px;"><h3 style="font-size:13px;">Size Groups</h3><button class="icon-btn" onclick="addRidGroup()">➕</button></div>
+            <div class="cost-col-labels" style="grid-template-columns:0.6fr 0.65fr 0.65fr auto;"><span>Count</span><span>W (in)</span><span>H (in)</span><span></span></div>
+            <div id="ridGroupsList"></div>
+            <div class="flag-hint">Add a group per photo size. Groups stack top to bottom on the sheet — this is how mixed layouts (e.g. some 2×2" + some 1×1") get built.</div>
+          </div>
+        </div>
+        <div class="card" id="ridPreviewOuter"><div id="ridPage"></div></div>
+      </div>
+    </div>
+
+    <!-- PRINTING RESTOCK (suppliers for printing materials) -->
+    <div class="page" id="page-printrestock">
+      <div class="page-head">
+        <div><h1>Printing Restock</h1><div class="sub">Where to buy your printing supplies — with links and locations</div></div>
+        <button class="btn" onclick="openSupplyModal()">+ Add Supply</button>
+      </div>
+      <div class="card" style="margin-bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <input id="psSearch" placeholder="Search supplies..." style="max-width:280px;" oninput="renderPrintSupplies()">
+        <div class="tabbar" id="psTabs" style="margin-bottom:0;">
+          <div class="tab active" data-cat="All">All</div>
+          <div class="tab" data-cat="Packaging Materials">Packaging Materials</div>
+          <div class="tab" data-cat="Papers & Cards">Papers &amp; Cards</div>
+          <div class="tab" data-cat="Tools & Accessories">Tools &amp; Accessories</div>
+        </div>
+      </div>
+      <div class="grid" id="printSuppliesGrid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+    </div>
+
+    <!-- STICKER GUIDES -->
+    <div class="page" id="page-stickerguides">
+      <div class="page-head">
+        <div><h1>Sticker Guides</h1><div class="sub">Upload your design, see how it fits your paper, plus your own notes</div></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" onclick="sgExportPng()">⬇ Export PNG</button>
+          <button class="btn" onclick="window.print()">🖨 Print</button>
+        </div>
+      </div>
+      <div class="two-col-rev" style="margin-bottom:24px;">
+        <div>
+          <div class="card" style="margin-bottom:14px;">
+            <label>Upload Sticker Design</label>
+            <input type="file" accept="image/*" onchange="sgOnPhotoUpload(event)">
+            <div class="flag-hint">One image — either scaled to fit the page, or repeated to fill it.</div>
+          </div>
+          <div class="card" style="margin-bottom:14px;">
+            <h3 style="font-size:13px; margin-bottom:10px;">Layout Mode</h3>
+            <div class="tabbar" id="sgModeTabs">
+              <div class="tab active" data-mode="fit">Fit to Page</div>
+              <div class="tab" data-mode="tile">Repeat &amp; Fill</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="font-size:13px; margin-bottom:10px;">Paper &amp; Sizing</h3>
+            <div class="field"><label>Paper</label>
+              <select id="sgPaper" onchange="sgOnChange()">
+                <option value="4x6">4R (4×6 in)</option>
+                <option value="5x7">5R (5×7 in)</option>
+                <option value="8.5x11" selected>Letter (8.5×11 in)</option>
+                <option value="8.27x11.69">A4 (8.27×11.69 in)</option>
+              </select>
+            </div>
+            <div id="sgTileFields" style="display:none;">
+              <div class="field-row">
+                <div class="field"><label>Sticker Width (in)</label><input type="number" step="0.1" id="sgCellW" value="2" oninput="sgOnChange()"></div>
+                <div class="field"><label>Sticker Height (in)</label><input type="number" step="0.1" id="sgCellH" value="2" oninput="sgOnChange()"></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>Margin (in)</label><input type="number" step="0.02" id="sgMargin" value="0.12" oninput="sgOnChange()"></div>
+                <div class="field"><label>Gap (in)</label><input type="number" step="0.02" id="sgGap" value="0.05" oninput="sgOnChange()"></div>
+              </div>
+              <div class="flag-hint" id="sgFitCount"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="sgPreviewOuter"><div id="sgPage"></div></div>
+      </div>
+
+      <div class="page-head">
+        <div><h2 style="font-size:18px;">Notes</h2></div>
+        <button class="btn" onclick="openStickerGuideModal()">+ Add Guide</button>
+      </div>
+      <div class="grid" id="stickerGuidesGrid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));"></div>
+    </div>
+
+    <!-- CHEAT SHEET -->
+    <div class="page" id="page-cheatsheet">
+      <div class="page-head">
+        <div><h1>Materials Cheat Sheet</h1><div class="sub">Which paper/material goes with which product</div></div>
+        <button class="btn" onclick="openCheatSheetModal()">+ Add</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Product</th><th>Material/Paper</th><th>GSM</th><th>Print Settings</th><th>Ink Type</th><th>Packaging</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="cheatSheetBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- BIR CALCULATOR -->
+    <div class="page" id="page-bir">
+      <div class="page-head"><div><h1>BIR Tax Calculator</h1><div class="sub">Estimate your income tax — for planning only</div></div></div>
+      <div class="card" style="margin-bottom:16px; max-width:560px;">
+        <div class="field"><label>Annual Gross Sales / Receipts (₱)</label><input type="number" id="birGross" oninput="renderBir()" placeholder="e.g. 480000"></div>
+        <div class="field"><label>Estimated Annual Deductions/Expenses (₱) — Graduated method only</label><input type="number" id="birDeductions" oninput="renderBir()" placeholder="e.g. 120000"></div>
+        <div class="flag-hint">Based on the TRAIN Law graduated table and the 8% flat-tax option available to self-employed individuals/sole proprietors with gross sales under ₱3,000,000 (not VAT-registered).</div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <h3 style="font-size:15px; margin-bottom:10px;">Option A — 8% Flat Tax</h3>
+          <div class="stat-label">Replaces both income tax and percentage tax</div>
+          <div class="stat-value amber" id="bir8Total" style="font-size:26px; margin:8px 0;">₱0</div>
+          <div style="font-size:12px; color:var(--text-muted);">8% × (Gross Sales − ₱250,000)</div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:15px; margin-bottom:10px;">Option B — Graduated + Percentage Tax</h3>
+          <div class="stat-label">Income Tax (graduated, on net income)</div>
+          <div class="stat-value" id="birGradIncome" style="font-size:17px; margin-bottom:8px;">₱0</div>
+          <div class="stat-label">Percentage Tax (3% of gross, Form 2551Q)</div>
+          <div class="stat-value" id="birPercentTax" style="font-size:17px; margin-bottom:8px;">₱0</div>
+          <div class="stat-label">Total</div>
+          <div class="stat-value" id="birGradTotal" style="font-size:26px;">₱0</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;" id="birRecommendation"></div>
+      <div class="flag-hint" style="margin-top:12px;">⚠️ Estimate only, based on 2026 rules. Actual tax due depends on your BIR registration type, deduction method (OSD vs itemized), and other income. Confirm with an accountant or the BIR before filing.</div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-head"><div><h1>Settings</h1><div class="sub">Local data &amp; preferences</div></div></div>
+      <div class="card" style="max-width:480px; margin-bottom:16px;">
+        <div class="field"><label>Days per month (for daily target calc)</label><input id="settingsDays" type="number" oninput="saveSettingsField()"></div>
+        <div class="flag-hint">Data currently lives in this browser only (localStorage). Database sync is the next step — nothing here will be lost when we wire it up.</div>
+      </div>
+      <div class="card" style="max-width:480px;">
+        <h3 style="font-size:14px; margin-bottom:12px;">Backup</h3>
+        <button class="btn secondary" style="width:100%; justify-content:center; margin-bottom:8px;" onclick="exportAllData()">⬇ Export All Data (JSON)</button>
+        <label style="margin-top:10px;">Import Data (JSON)</label>
+        <input type="file" accept=".json" onchange="importAllData(event)">
+        <button class="btn danger" style="width:100%; justify-content:center; margin-top:14px;" onclick="resetAllData()">Reset All Data</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="modalOverlay"><div class="modal" id="modalBody"></div></div>
+<div id="quoteCardOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.78); z-index:150; align-items:center; justify-content:center; padding:20px; flex-direction:column; gap:14px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; width:100%; max-width:400px;">
+    <span class="badge green">✓ FINALIZED</span>
+    <button class="icon-btn" style="color:#fff; font-size:18px;" onclick="closeQuoteCard()">✕</button>
+  </div>
+  <div id="quoteCardInner" style="width:100%; max-width:400px; background:#fff; border-radius:14px; overflow:hidden;"></div>
+  <div style="display:flex; gap:10px; width:100%; max-width:400px;">
+    <button class="btn secondary" style="flex:1; justify-content:center;" onclick="copyQuoteImage()">📋 Copy Image</button>
+    <button class="btn" style="flex:1; justify-content:center;" onclick="saveQuoteImage()">⬇ Save Image</button>
+  </div>
+  <button class="btn" style="width:100%; max-width:400px; justify-content:center; background:var(--green); color:#0c1a0c;" onclick="convertQuoteToJobOrder()">🛍 Convert to Job Order</button>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ===================== STORAGE ===================== */
+function storageGet(key, def){ try{ const v = localStorage.getItem(key); return v!==null ? JSON.parse(v) : def; }catch(e){ return def; } }
+function storageSet(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+function uid(){ return 'id_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function peso(n){ n = Number(n)||0; return '₱' + n.toLocaleString('en-PH', {maximumFractionDigits:2}); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function daysAgoStr(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }
+function parseMoney(v){ if(v==null) return 0; const n = parseFloat(String(v).replace(/[₱,\s]/g,'')); return isNaN(n)?0:n; }
+
+/* ===================== STATE ===================== */
+let state = {
+  products: storageGet('am_products', []),
+  sales: storageGet('am_sales', []),
+  dailyExpenses: storageGet('am_daily_expenses', []),
+  customers: storageGet('am_customers', []),
+  expenses: storageGet('am_expenses', []),
+  restock: storageGet('am_restock', []),
+  costings: storageGet('am_costings', []),
+  cheatSheet: storageGet('am_cheatsheet', null),
+  printProducts: storageGet('am_print_products', null),
+  stickerGuides: storageGet('am_sticker_guides', null),
+  printSupplies: storageGet('am_print_supplies', []),
+  jobOrders: storageGet('am_job_orders', []),
+  quotations: storageGet('am_quotations', []),
+  counters: storageGet('am_counters', null),
+  settings: storageGet('am_settings', {days_per_month:26}),
+  activeCategory: 'Food',
+};
+if(state.printProducts === null) state.printProducts = [];
+if(state.cheatSheet === null) state.cheatSheet = [];
+if(state.counters === null) state.counters = { jobOrderSeq: 1001 };
+function ensureProduct(category,name,paper,ink,op,minutes){
+  let p = state.printProducts.find(x=>x.category.toLowerCase()===category.toLowerCase() && x.name.toLowerCase()===name.toLowerCase());
+  if(!p){ p = {id:uid(), category, name, paper, ink, op, minutes}; state.printProducts.push(p); }
+  return p;
+}
+function ensureCheatSheet(product, fields){
+  const exists = state.cheatSheet.find(c=>c.product.toLowerCase()===product.toLowerCase());
+  if(exists) return;
+  state.cheatSheet.push({ id: uid(), product, material:'', gsm:'', paperType:'', printQuality:'Standard', inkType:'', packaging:'', notes:'', ...(fields||{}) });
+}
+// migrate any older cheat sheet entries (pre paper-type/gsm/ink schema) to the new shape
+state.cheatSheet.forEach(c=>{
+  if(c.gsm===undefined){
+    const m = (c.material||'').match(/(\d+)\s*gsm/i);
+    c.gsm = m ? m[1] : '';
+    c.paperType = c.paperType || (c.material||'').replace(/\d+\s*gsm/i,'').trim();
+    c.printQuality = c.printQuality || 'Standard';
+    c.inkType = c.inkType || '';
+    c.packaging = c.packaging || '';
+    c.notes = c.notes || '';
+  }
+});
+// baseline product catalog (only added if missing — won't duplicate what you've already edited)
+ensureProduct('Photocopy','B&W',1,1,0.5,0.2);
+ensureProduct('Photocopy','Partially Colored',1,3.5,0.7,0.25);
+ensureProduct('Photocopy','Full Colored',1,6,1,0.3);
+ensureProduct('Photocopy with Image','B&W',1,2,0.6,0.3);
+ensureProduct('Photocopy with Image','Partially Colored',1,6,1,0.35);
+ensureProduct('Photocopy with Image','Full Colored',1,9,1.3,0.4);
+ensureProduct('Souvenirs','Party Hat',12,9,2.5,3);
+ensureProduct('Souvenirs','Gobble Box',14,9,3,4);
+ensureProduct('Souvenirs','Chipbag',10,7,2,2.5);
+ensureProduct('Souvenirs','Photostrip',8,10,2,2);
+ensureProduct('Souvenirs','Trinket',10,6,3,4);
+ensureProduct('Photoprint','2R Size',2.4,3.6,0.45,0.5);
+ensureProduct('Photoprint','3R Size',3.2,4.8,0.6,0.5);
+ensureProduct('Photoprint','4R Size',4,6,0.75,0.5);
+ensureProduct('Photoprint','5R Size',5.6,8.4,1.05,0.5);
+ensureProduct('Photoprint','6R Size',6.8,10.2,1.275,0.5);
+ensureProduct('Photoprint','A4',8,12,1.5,0.5);
+ensureProduct('Rush ID','Package 1',10,6,2,5);
+ensureProduct('Rush ID','Package 2',12,7,2.2,6);
+ensureProduct('Stickers','Sticker Print',15,10,2,1);
+ensureProduct('Souvenirs','Button Pin',6,5,1.5,2);
+// cheat sheet entries (only added if that product name isn't already listed)
+ensureCheatSheet('Document / Photocopy', { material:'Bond Paper', gsm:'70', paperType:'Bond Paper', printQuality:'Standard' });
+ensureCheatSheet('Rush ID', { material:'CUYI RC Satin', paperType:'RC Satin', printQuality:'High' });
+ensureCheatSheet('Photostrip', {});
+ensureCheatSheet('Party Hat', { material:'Quaff Photopaper', gsm:'200', paperType:'Photopaper', printQuality:'Standard' });
+ensureCheatSheet('Chipbag', { material:'QUAFF Photo Paper No Back Print', gsm:'135', paperType:'Photo Paper No Back Print', printQuality:'Standard' });
+ensureCheatSheet('Sticker', { material:'QUAFF Matte Sticker Paper', gsm:'135', paperType:'Matte Sticker Paper', printQuality:'Standard' });
+ensureCheatSheet('Trinket', { material:'Photo paper glossy lamination', paperType:'Glossy Lamination', printQuality:'High' });
+ensureCheatSheet('Button Pin Maker', { material:'Quaff Double Sided Photopaper', gsm:'120', paperType:'Double Sided Photopaper', printQuality:'Standard' });
+ensureCheatSheet('Mini Stickers Plastic (2¼ × 4in)', { paperType:'Plastic', packaging:'12 pcs/pack', notes:'Sell ₱10/12pcs — scalable to ₱15' });
+ensureCheatSheet('Pigment Printer (CUYI)', { inkType:'Pigment Ink', notes:'Printer: CUYI' });
+saveAll();
+if(state.stickerGuides === null){
+  state.stickerGuides = [
+    { id: uid(), title:'Common Sticker Sizes', details:'2×2in and 3×3in for individual labels; 4×4in for bigger designs; full A4 sheet for custom die-cuts or multi-design sheets.' },
+    { id: uid(), title:'Recommended Paper', details:'QUAFF Matte Sticker Paper 135gsm is the current go-to — see the Cheat Sheet page for the full up-to-date material list.' },
+    { id: uid(), title:'Cutting Tips', details:'Kiss-cut for peel-off labels that stay on the backing sheet; full die-cut for standalone shaped stickers. Leave a 2–3mm bleed around each design before cutting.' },
+  ];
+}
+function saveAll(){
+  storageSet('am_products', state.products);
+  storageSet('am_sales', state.sales);
+  storageSet('am_daily_expenses', state.dailyExpenses);
+  storageSet('am_customers', state.customers);
+  storageSet('am_expenses', state.expenses);
+  storageSet('am_restock', state.restock);
+  storageSet('am_costings', state.costings);
+  storageSet('am_cheatsheet', state.cheatSheet);
+  storageSet('am_print_products', state.printProducts);
+  storageSet('am_sticker_guides', state.stickerGuides);
+  storageSet('am_print_supplies', state.printSupplies);
+  storageSet('am_job_orders', state.jobOrders);
+  storageSet('am_quotations', state.quotations);
+  storageSet('am_counters', state.counters);
+  storageSet('am_settings', state.settings);
+}
+let chart = null;
+
+/* ===================== NAV ===================== */
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    item.classList.add('active');
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-'+item.dataset.page).classList.add('active');
+  });
+});
+document.querySelectorAll('#invTabs .tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('#invTabs .tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    state.activeCategory = t.dataset.cat;
+    renderInventory();
+  });
+});
+document.getElementById('salesDateFilter').addEventListener('change', renderSales);
+
+/* ===================== BOOT ===================== */
+function boot(){
+  document.getElementById('salesDateFilter').value = todayStr();
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  document.getElementById('settingsDays').value = state.settings.days_per_month;
+  renderAll();
+  initCostingRows();
+  buildProductSelect();
+  onQuickJobTypeChange();
+  renderPrintProducts();
+  renderQjComponents();
+  renderCheatSheet();
+  renderCheatSheetHints();
+  renderStickerGuides();
+  renderPrintSupplies();
+  renderRidGroups();
+  sgRender();
+  populatePrintProductSuggestions();
+  renderQuotationsList();
+  renderJobOrdersList();
+  renderJoStats();
+  renderBir();
+}
+function renderAll(){
+  renderDashboard(); renderInventory(); renderSales(); renderRestock(); renderCustomers(); renderFinances(); renderCostingsList();
+}
+
+/* ===================== DASHBOARD ===================== */
+function renderDashboard(){
+  const today = todayStr(); const weekStart = daysAgoStr(6); const monthPrefix = today.slice(0,7);
+  const todayTotal = state.sales.filter(s=>s.sale_date===today).reduce((a,s)=>a+Number(s.total||0),0);
+  const weekTotal = state.sales.filter(s=>s.sale_date>=weekStart).reduce((a,s)=>a+Number(s.total||0),0);
+  const monthTotal = state.sales.filter(s=>s.sale_date.startsWith(monthPrefix)).reduce((a,s)=>a+Number(s.total||0),0);
+  const needsRestock = state.products.filter(p=>Number(p.stock||0) <= Number(p.par_level||0)).length;
+  document.getElementById('statToday').textContent = peso(todayTotal);
+  document.getElementById('statWeek').textContent = peso(weekTotal);
+  document.getElementById('statMonth').textContent = peso(monthTotal);
+  document.getElementById('statRestock').textContent = needsRestock;
+
+  const tally = {};
+  state.sales.filter(s=>s.sale_date.startsWith(monthPrefix)).forEach(s=>{ const key = s.product_name_snapshot||'Unknown'; tally[key]=(tally[key]||0)+Number(s.qty||0); });
+  const top = Object.entries(tally).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('statTop').textContent = top ? top[0] : '—';
+
+  const budgetTotal = state.expenses.reduce((a,e)=>a+Number(e.budget||0),0);
+  const dailyTarget = budgetTotal / (state.settings.days_per_month || 26);
+  document.getElementById('dailyTarget').textContent = peso(dailyTarget);
+  const statusEl = document.getElementById('targetStatus');
+  if(todayTotal===0){ statusEl.className='badge gray'; statusEl.textContent='No sales logged yet today'; }
+  else if(todayTotal>=dailyTarget){ statusEl.className='badge green'; statusEl.textContent='🟢 Above target — '+peso(todayTotal-dailyTarget)+' ahead'; }
+  else { statusEl.className='badge red'; statusEl.textContent='🔴 Below target — '+peso(dailyTarget-todayTotal)+' short'; }
+
+  const labels=[], data=[];
+  for(let i=6;i>=0;i--){ const d=daysAgoStr(i); labels.push(new Date(d).toLocaleDateString('en-US',{weekday:'short'})); data.push(state.sales.filter(s=>s.sale_date===d).reduce((a,s)=>a+Number(s.total||0),0)); }
+  const ctx = document.getElementById('salesChart');
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, { type:'line', data:{ labels, datasets:[{ data, borderColor:'#e8963c', backgroundColor:'rgba(232,150,60,.12)', fill:true, tension:.35, pointRadius:3, pointBackgroundColor:'#e8963c' }]},
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{grid:{color:'#2a2a20'}, ticks:{color:'#a39d8c'}}, x:{grid:{display:false}, ticks:{color:'#a39d8c'}} } } });
+}
+
+/* ===================== INVENTORY ===================== */
+function restockFlag(p){
+  const stock=Number(p.stock||0), par=Number(p.par_level||0);
+  if(stock<=0) return {label:'🔴 Reorder now', cls:'red'};
+  if(stock<=par) return {label:'🟠 Low — restock', cls:'orange'};
+  return {label:'✅ Stocked', cls:'green'};
+}
+function renderInventory(){
+  const body = document.getElementById('inventoryBody');
+  const items = state.products.filter(p=>p.category===state.activeCategory);
+  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="10">No products in this category yet.</td></tr>`; return; }
+  body.innerHTML = items.map(p=>{
+    const flag = restockFlag(p);
+    const profit = (Number(p.sell_price||0)-Number(p.restock_cost||0));
+    return `<tr>
+      <td class="mono">${escapeHtml(p.id)}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.brand||'—')}</td>
+      <td>${p.stock??0}</td><td>${p.par_level??0}</td><td>${peso(p.restock_cost)}</td><td>${peso(p.sell_price)}</td><td>${peso(profit)}</td>
+      <td><span class="badge ${flag.cls}">${flag.label}</span></td>
+      <td><button class="icon-btn" onclick="openProductModal('${p.id}')">✏️</button><button class="icon-btn" onclick="deleteProduct('${p.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+function openProductModal(id){
+  const p = id ? state.products.find(x=>x.id===id) : null;
+  const cats = ['Food','ToysCandies','Others'];
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${p?'Edit':'Add'} Product</h3>
+    <div class="field-row">
+      <div class="field"><label>ID / SKU</label><input id="f_id" value="${p?escapeHtml(p.id):''}" ${p?'disabled':''}></div>
+      <div class="field"><label>Category</label><select id="f_category">${cats.map(c=>`<option ${p&&p.category===c?'selected':''} ${!p&&c===state.activeCategory?'selected':''}>${c}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label>Product Name</label><input id="f_name" value="${p?escapeHtml(p.name):''}"></div>
+    <div class="field-row">
+      <div class="field"><label>Brand</label><input id="f_brand" value="${p?escapeHtml(p.brand||''):''}"></div>
+      <div class="field"><label>Type</label><input id="f_type" value="${p?escapeHtml(p.type||''):''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Stock</label><input id="f_stock" type="number" step="any" value="${p?p.stock??'':''}"></div>
+      <div class="field"><label>Par Level</label><input id="f_par" type="number" step="any" value="${p?p.par_level??'':''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Restock Cost</label><input id="f_rcost" type="number" step="any" value="${p?p.restock_cost??'':''}"></div>
+      <div class="field"><label>Sell Price</label><input id="f_sell" type="number" step="any" value="${p?p.sell_price??'':''}"></div>
+    </div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveProduct(${p?`'${p.id}'`:'null'})">Save</button></div>`;
+  openModal();
+}
+function saveProduct(existingId){
+  const name = document.getElementById('f_name').value.trim();
+  if(!name){ toast('Product name is required'); return; }
+  const payload = {
+    category: document.getElementById('f_category').value, name,
+    brand: document.getElementById('f_brand').value.trim(), type: document.getElementById('f_type').value.trim(),
+    stock: Number(document.getElementById('f_stock').value)||0, par_level: Number(document.getElementById('f_par').value)||0,
+    restock_cost: Number(document.getElementById('f_rcost').value)||0, sell_price: Number(document.getElementById('f_sell').value)||0,
+  };
+  if(existingId){
+    const p = state.products.find(x=>x.id===existingId); Object.assign(p, payload);
+  } else {
+    const id = document.getElementById('f_id').value.trim();
+    if(!id){ toast('ID / SKU is required'); return; }
+    if(state.products.some(p=>p.id===id)){ toast('That ID already exists'); return; }
+    state.products.push({ id, ...payload });
+  }
+  saveAll(); closeModal(); toast('Product saved'); renderAll();
+}
+function deleteProduct(id){
+  if(!confirm('Delete this product?')) return;
+  state.products = state.products.filter(p=>p.id!==id);
+  saveAll(); toast('Deleted'); renderAll();
+}
+
+/* ===================== SALES LOG ===================== */
+function renderSales(){
+  const date = document.getElementById('salesDateFilter').value || todayStr();
+  const items = state.sales.filter(s=>s.sale_date===date);
+  const dayExpenses = state.dailyExpenses.filter(e=>e.date===date);
+  const body = document.getElementById('salesBody');
+  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="7">No sales logged for this date.</td></tr>`; }
+  else{
+    body.innerHTML = items.map(s=>`<tr>
+      <td>${s.qty}</td><td>${escapeHtml(s.product_name_snapshot||'—')}</td><td>${peso(s.price)}</td><td>${peso(s.total)}</td><td>${escapeHtml(s.category||'')}</td><td>${escapeHtml(s.remarks||'')}</td>
+      <td><button class="icon-btn" onclick="deleteSale('${s.id}')">🗑️</button></td></tr>`).join('');
+  }
+  const expBody = document.getElementById('dailyExpensesBody');
+  if(!dayExpenses.length){ expBody.innerHTML = `<tr class="empty-row"><td colspan="3">No expenses today.</td></tr>`; }
+  else{
+    expBody.innerHTML = dayExpenses.map(e=>`<tr><td>${escapeHtml(e.item)}</td><td>${peso(e.amount)}</td><td><button class="icon-btn" onclick="deleteDailyExpense('${e.id}')">🗑️</button></td></tr>`).join('');
+  }
+
+  const totalItems = items.reduce((a,s)=>a+Number(s.qty||0),0);
+  const todaysSale = items.reduce((a,s)=>a+Number(s.total||0),0);
+  const opex = dayExpenses.reduce((a,e)=>a+Number(e.amount||0),0);
+  const grandTotal = todaysSale - opex;
+  const prodTally={}, typeTally={};
+  items.forEach(s=>{ const pn=s.product_name_snapshot||'—'; const tp=s.category||'—'; prodTally[pn]=(prodTally[pn]||0)+Number(s.qty||0); typeTally[tp]=(typeTally[tp]||0)+Number(s.qty||0); });
+  const topProduct = Object.entries(prodTally).sort((a,b)=>b[1]-a[1])[0];
+  const topMoving = Object.entries(typeTally).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('salesSummaryStats').innerHTML = `
+    <div class="card"><div class="stat-label">📦 Total Items</div><div class="stat-value" style="font-size:20px;">${totalItems}</div></div>
+    <div class="card"><div class="stat-label">🧮 Today's Sale</div><div class="stat-value amber" style="font-size:20px;">${peso(todaysSale)}</div></div>
+    <div class="card"><div class="stat-label">🚢 Top Product</div><div class="stat-value" style="font-size:15px;">${topProduct?escapeHtml(topProduct[0]):'—'}</div></div>
+    <div class="card"><div class="stat-label">🏆 Top Moving</div><div class="stat-value" style="font-size:15px;">${topMoving?escapeHtml(topMoving[0]):'—'}</div></div>
+    <div class="card"><div class="stat-label">💸 OPEX</div><div class="stat-value red" style="font-size:20px;">${peso(opex)}</div></div>
+    <div class="card"><div class="stat-label">💵 Grand Total</div><div class="stat-value green" style="font-size:20px;">${peso(grandTotal)}</div></div>
+  `;
+  const names = new Set(state.products.map(p=>p.name));
+  state.sales.forEach(s=>{ if(s.product_name_snapshot) names.add(s.product_name_snapshot); });
+  document.getElementById('productSuggestions').innerHTML = [...names].map(n=>`<option value="${escapeHtml(n)}">`).join('');
+}
+function quickAddSale(){
+  const qty = Number(document.getElementById('qa_qty').value)||0;
+  const product = document.getElementById('qa_product').value.trim();
+  const price = Number(document.getElementById('qa_price').value)||0;
+  const type = document.getElementById('qa_type').value.trim();
+  const remarks = document.getElementById('qa_remarks').value.trim();
+  if(!product || qty<=0){ toast('Enter product and qty'); return; }
+  const date = document.getElementById('salesDateFilter').value || todayStr();
+  const matched = state.products.find(p=>p.name.toLowerCase()===product.toLowerCase());
+  state.sales.unshift({ id: uid(), sale_date: date, product_id: matched?matched.id:null, product_name_snapshot: product, category: type, qty, price, total: qty*price, remarks });
+  if(matched) matched.stock = Number(matched.stock||0) - qty;
+  saveAll();
+  document.getElementById('qa_qty').value='1'; document.getElementById('qa_product').value=''; document.getElementById('qa_price').value=''; document.getElementById('qa_type').value=''; document.getElementById('qa_remarks').value='';
+  toast('Sale added'); renderAll();
+  document.getElementById('qa_product').focus();
+}
+function deleteSale(id){
+  if(!confirm('Delete this sale? Stock will be restored.')) return;
+  const s = state.sales.find(x=>x.id===id);
+  if(s && s.product_id){ const product = state.products.find(p=>p.id===s.product_id); if(product) product.stock = Number(product.stock||0)+Number(s.qty||0); }
+  state.sales = state.sales.filter(x=>x.id!==id);
+  saveAll(); toast('Sale deleted'); renderAll();
+}
+function quickAddExpense(){
+  const item = document.getElementById('qa_exp_item').value.trim();
+  const amount = Number(document.getElementById('qa_exp_amt').value)||0;
+  if(!item){ toast('Enter expense item'); return; }
+  const date = document.getElementById('salesDateFilter').value || todayStr();
+  state.dailyExpenses.unshift({ id: uid(), date, item, amount });
+  saveAll();
+  document.getElementById('qa_exp_item').value=''; document.getElementById('qa_exp_amt').value='';
+  toast('Expense added'); renderSales();
+}
+function deleteDailyExpense(id){ state.dailyExpenses = state.dailyExpenses.filter(e=>e.id!==id); saveAll(); renderSales(); }
+
+/* CSV Import — matches the exact daily sheet export format */
+function openCsvImportModal(){
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Import Daily Sheet CSV</h3>
+    <p style="font-size:12px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">Upload the CSV exported straight from your daily sheet (QTY / PRODUCT / PRICE / TOTAL / TYPE / Remarks, with Expense Item / Amount alongside). The date is read from the top-left cell automatically.</p>
+    <div class="field"><label>CSV File</label><input type="file" id="csvFile" accept=".csv" onchange="parseCsvPreview(event)"></div>
+    <div id="csvPreviewWrap" style="max-height:260px; overflow:auto; margin:10px 0;"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" id="csvConfirmBtn" style="display:none;" onclick="confirmCsvImport()">Import</button></div>`;
+  openModal();
+}
+let csvParsed = null;
+function parseCsvPreview(e){
+  const file = e.target.files[0]; if(!file) return;
+  Papa.parse(file, { complete: (res)=>{
+    const rows = res.data;
+    const dateCell = rows[0] && rows[0][0];
+    const parsedDate = new Date(dateCell);
+    const saleDate = isNaN(parsedDate.getTime()) ? todayStr() : parsedDate.toISOString().slice(0,10);
+    let headerIdx = rows.findIndex(r => (r[0]||'').toString().trim().toUpperCase()==='QTY');
+    if(headerIdx===-1) headerIdx = 0;
+    const sales = [], expenses = [];
+    rows.slice(headerIdx+1).forEach(r=>{
+      const qty = parseMoney(r[0]); const product = (r[1]||'').trim();
+      if(qty>0 && product){ sales.push({ qty, product, price: parseMoney(r[2]), total: parseMoney(r[3])||qty*parseMoney(r[2]), type:(r[4]||'').trim(), remarks:(r[5]||'').trim() }); }
+      const expItem = (r[8]||'').trim(); const expAmt = parseMoney(r[9]);
+      if(expItem){ expenses.push({ item: expItem, amount: expAmt }); }
+    });
+    csvParsed = { saleDate, sales, expenses };
+    document.getElementById('csvPreviewWrap').innerHTML = `
+      <div style="font-size:12px; margin-bottom:8px;">Detected date: <b>${saleDate}</b> — ${sales.length} sales rows, ${expenses.length} expense rows</div>
+      <table><thead><tr><th>Qty</th><th>Product</th><th>Price</th><th>Type</th></tr></thead><tbody>${
+        sales.slice(0,50).map(s=>`<tr><td>${s.qty}</td><td>${escapeHtml(s.product)}</td><td>${s.price}</td><td>${escapeHtml(s.type)}</td></tr>`).join('')
+      }</tbody></table>`;
+    document.getElementById('csvConfirmBtn').style.display = sales.length ? 'inline-flex':'none';
+  }});
+}
+function confirmCsvImport(){
+  if(!csvParsed) return;
+  const { saleDate, sales, expenses } = csvParsed;
+  sales.forEach(r=>{
+    const matched = state.products.find(p=>p.name.toLowerCase()===r.product.toLowerCase());
+    state.sales.unshift({ id: uid(), sale_date: saleDate, product_id: matched?matched.id:null, product_name_snapshot: r.product, category: r.type, qty:r.qty, price:r.price, total:r.total, remarks:r.remarks });
+    if(matched) matched.stock = Number(matched.stock||0) - r.qty;
+  });
+  expenses.forEach(exp=>{ state.dailyExpenses.unshift({ id: uid(), date: saleDate, item: exp.item, amount: exp.amount }); });
+  const sCount = sales.length, eCount = expenses.length; csvParsed = null;
+  saveAll(); closeModal(); toast(`Imported ${sCount} sales + ${eCount} expenses for ${saleDate}`);
+  document.getElementById('salesDateFilter').value = saleDate;
+  renderAll();
+}
+
+/* ===================== RESTOCK ===================== */
+function renderRestock(){
+  const body = document.getElementById('restockBody');
+  if(!state.restock.length){ body.innerHTML = `<tr class="empty-row"><td colspan="8">Nothing in the restock plan yet.</td></tr>`; return; }
+  body.innerHTML = state.restock.map(r=>`<tr>
+    <td>${escapeHtml(r.product_name)}</td><td>${escapeHtml(r.category||'—')}</td><td>${r.pcs_per_pack??'—'}</td><td>${peso(r.cost_price)}</td><td>${r.qty_buying??0}</td><td>${peso((r.cost_price||0)*(r.qty_buying||0))}</td>
+    <td><span class="badge ${r.status==='Bought'?'green':r.status==='Cancelled'?'gray':'orange'}">${r.status}</span></td>
+    <td>${r.status==='Pending'?`<button class="icon-btn" onclick="markBought('${r.id}')">✅</button>`:''}<button class="icon-btn" onclick="deleteRestock('${r.id}')">🗑️</button></td>
+  </tr>`).join('');
+}
+function openRestockModal(){
+  const options = state.products.map(p=>`<option value="${p.id}" data-name="${escapeHtml(p.name)}" data-cat="${p.category}">${escapeHtml(p.name)} (${p.id})</option>`).join('');
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Add to Restock Plan</h3>
+    <div class="field"><label>Link to product (optional)</label><select id="r_product" onchange="onRestockProductChange()"><option value="">— manual entry —</option>${options}</select></div>
+    <div class="field"><label>Product Name</label><input id="r_name"></div>
+    <div class="field-row"><div class="field"><label>Pcs per Pack</label><input id="r_pcs" type="number" step="any"></div><div class="field"><label>Cost Price</label><input id="r_cost" type="number" step="any"></div></div>
+    <div class="field"><label>Qty Buying</label><input id="r_qty" type="number" step="any" value="1"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveRestock()">Add</button></div>`;
+  openModal();
+}
+function onRestockProductChange(){ const sel=document.getElementById('r_product'); const opt=sel.options[sel.selectedIndex]; document.getElementById('r_name').value = opt.dataset.name||''; }
+function saveRestock(){
+  const sel = document.getElementById('r_product'); const opt = sel.options[sel.selectedIndex]; const productId = sel.value||null;
+  const name = document.getElementById('r_name').value.trim();
+  if(!name){ toast('Product name required'); return; }
+  state.restock.unshift({ id: uid(), product_id: productId, product_name: name, category: productId?opt.dataset.cat:null,
+    pcs_per_pack: Number(document.getElementById('r_pcs').value)||null, cost_price: Number(document.getElementById('r_cost').value)||0,
+    qty_buying: Number(document.getElementById('r_qty').value)||1, status:'Pending' });
+  saveAll(); closeModal(); toast('Added to restock plan'); renderAll();
+}
+function markBought(id){
+  const r = state.restock.find(x=>x.id===id); if(!r) return;
+  r.status='Bought';
+  if(r.product_id){ const product = state.products.find(p=>p.id===r.product_id); if(product) product.stock = Number(product.stock||0)+Number(r.qty_buying||0); }
+  saveAll(); toast('Marked bought — stock updated'); renderAll();
+}
+function deleteRestock(id){ if(!confirm('Remove from restock plan?')) return; state.restock = state.restock.filter(r=>r.id!==id); saveAll(); toast('Removed'); renderAll(); }
+
+/* ===================== CUSTOMERS ===================== */
+function renderCustomers(){
+  const body = document.getElementById('customersBody');
+  if(!state.customers.length){ body.innerHTML = `<tr class="empty-row"><td colspan="9">No customers yet.</td></tr>`; return; }
+  body.innerHTML = state.customers.map(c=>`<tr>
+    <td>${escapeHtml(c.name)}</td><td><span class="badge ${c.type==='Suki'?'green':'gray'}">${escapeHtml(c.type)}</span></td><td>${escapeHtml(c.contact||'—')}</td>
+    <td>${c.visits??0}</td><td>${peso(c.avg_spend)}</td><td>${escapeHtml(c.fav_product||'—')}</td><td>${c.discount_pct?c.discount_pct+'%':'—'}</td><td>${c.next_follow_up||'—'}</td>
+    <td><button class="icon-btn" onclick="openCustomerModal('${c.id}')">✏️</button><button class="icon-btn" onclick="deleteCustomer('${c.id}')">🗑️</button></td>
+  </tr>`).join('');
+}
+function openCustomerModal(id){
+  const c = id ? state.customers.find(x=>x.id===id) : null;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${c?'Edit':'Add'} Customer</h3>
+    <div class="field"><label>Name</label><input id="c_name" value="${c?escapeHtml(c.name):''}"></div>
+    <div class="field-row">
+      <div class="field"><label>Contact #</label><input id="c_contact" value="${c?escapeHtml(c.contact||''):''}"></div>
+      <div class="field"><label>Type</label><select id="c_type">${['Suki','Regular','Occasional'].map(t=>`<option ${c&&c.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Barangay</label><input id="c_barangay" value="${c?escapeHtml(c.barangay||''):''}"></div>
+      <div class="field"><label>Fav Product</label><input id="c_fav" value="${c?escapeHtml(c.fav_product||''):''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Discount %</label><input id="c_discount" type="number" step="any" value="${c?c.discount_pct??0:0}"></div>
+      <div class="field"><label>Next Follow-up</label><input id="c_followup" type="date" value="${c?c.next_follow_up||'':''}"></div>
+    </div>
+    <div class="field"><label>Remarks</label><input id="c_remarks" value="${c?escapeHtml(c.remarks||''):''}"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCustomer(${c?`'${c.id}'`:'null'})">Save</button></div>`;
+  openModal();
+}
+function saveCustomer(id){
+  const name = document.getElementById('c_name').value.trim();
+  if(!name){ toast('Name required'); return; }
+  const payload = { name, contact: document.getElementById('c_contact').value.trim(), type: document.getElementById('c_type').value,
+    barangay: document.getElementById('c_barangay').value.trim(), fav_product: document.getElementById('c_fav').value.trim(),
+    discount_pct: Number(document.getElementById('c_discount').value)||0, next_follow_up: document.getElementById('c_followup').value||null,
+    remarks: document.getElementById('c_remarks').value.trim() };
+  if(id){ const c = state.customers.find(x=>x.id===id); Object.assign(c, payload); }
+  else { state.customers.unshift({ id: uid(), visits:0, avg_spend:0, ...payload }); }
+  saveAll(); closeModal(); toast('Customer saved'); renderAll();
+}
+function deleteCustomer(id){ if(!confirm('Delete this customer?')) return; state.customers = state.customers.filter(c=>c.id!==id); saveAll(); toast('Deleted'); renderAll(); }
+
+/* ===================== FINANCES ===================== */
+function renderFinances(){
+  const budgetTotal = state.expenses.reduce((a,e)=>a+Number(e.budget||0),0);
+  const actualTotal = state.expenses.reduce((a,e)=>a+Number(e.actual||0),0);
+  document.getElementById('finBudget').textContent = peso(budgetTotal);
+  document.getElementById('finActual').textContent = peso(actualTotal);
+  document.getElementById('finDaily').textContent = peso(budgetTotal/(state.settings.days_per_month||26));
+  const body = document.getElementById('expensesBody');
+  if(!state.expenses.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No expenses logged yet.</td></tr>`; return; }
+  body.innerHTML = state.expenses.map(e=>`<tr>
+    <td>${escapeHtml(e.category)}</td><td>${escapeHtml(e.details||'—')}</td><td>${escapeHtml(e.frequency||'—')}</td><td>${peso(e.budget)}</td><td>${peso(e.actual)}</td>
+    <td><button class="icon-btn" onclick="deleteExpense('${e.id}')">🗑️</button></td></tr>`).join('');
+}
+function openExpenseModal(){
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Add Expense</h3>
+    <div class="field"><label>Category</label><input id="e_cat" placeholder="Rent, Electricity, Loan..."></div>
+    <div class="field"><label>Details</label><input id="e_details"></div>
+    <div class="field"><label>Frequency</label><select id="e_freq">${['Weekly','Bi-weekly','Monthly'].map(f=>`<option>${f}</option>`).join('')}</select></div>
+    <div class="field-row"><div class="field"><label>Budget (₱)</label><input id="e_budget" type="number" step="any"></div><div class="field"><label>Actual (₱)</label><input id="e_actual" type="number" step="any"></div></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense()">Save</button></div>`;
+  openModal();
+}
+function saveExpense(){
+  const category = document.getElementById('e_cat').value.trim();
+  if(!category){ toast('Category required'); return; }
+  state.expenses.unshift({ id: uid(), category, details: document.getElementById('e_details').value.trim(), frequency: document.getElementById('e_freq').value,
+    budget: Number(document.getElementById('e_budget').value)||0, actual: Number(document.getElementById('e_actual').value)||0, month: todayStr().slice(0,7) });
+  saveAll(); closeModal(); toast('Expense added'); renderAll();
+}
+function deleteExpense(id){ if(!confirm('Delete this expense?')) return; state.expenses = state.expenses.filter(e=>e.id!==id); saveAll(); toast('Deleted'); renderAll(); }
+
+/* ===================== PRINTING COSTING — QUICK JOB TEMPLATES ===================== */
+let qjMaterialOverride = null;
+function buildProductSelect(){
+  const sel = document.getElementById('qj_type');
+  const prevValue = sel.value;
+  const cats = {};
+  state.printProducts.forEach(p=>{ (cats[p.category] = cats[p.category]||[]).push(p); });
+  sel.innerHTML = Object.entries(cats).map(([cat,items])=>
+    `<optgroup label="${escapeHtml(cat)}">${items.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</optgroup>`
+  ).join('');
+  if(state.printProducts.some(p=>p.id===prevValue)) sel.value = prevValue;
+}
+let qjRatesTouched = false;
+function onQuickJobTypeChange(){
+  const item = state.printProducts.find(p=>p.id===document.getElementById('qj_type').value);
+  if(item){
+    document.getElementById('qj_minutes').value = item.minutes;
+    document.getElementById('qj_paperCost').value = item.paper;
+    document.getElementById('qj_inkCost').value = item.ink;
+    document.getElementById('qj_opCost').value = item.op;
+  }
+  qjRatesTouched = false;
+  qjMaterialOverride = null;
+  renderCheatSheetHints();
+}
+function qjSaveRatesToProduct(){
+  const item = state.printProducts.find(p=>p.id===document.getElementById('qj_type').value);
+  if(!item){ toast('Pick a product first'); return; }
+  item.paper = Number(document.getElementById('qj_paperCost').value)||0;
+  item.ink = Number(document.getElementById('qj_inkCost').value)||0;
+  item.op = Number(document.getElementById('qj_opCost').value)||0;
+  item.minutes = Number(document.getElementById('qj_minutes').value)||item.minutes;
+  saveAll(); renderPrintProducts(); toast(`Saved — ${item.name} updated in Manage Products`);
+}
+function renderCheatSheetHints(){
+  const item = state.printProducts.find(p=>p.id===document.getElementById('qj_type').value);
+  const wrap = document.getElementById('qj_cheatHints');
+  if(!item){ wrap.innerHTML=''; return; }
+  const name = item.name.toLowerCase(), cat = item.category.toLowerCase(), needle = (name+' '+cat);
+  const matches = state.cheatSheet.filter(c=>{
+    const hay = c.product.toLowerCase();
+    return needle.includes(hay) || hay.includes(name) || hay.includes(cat);
+  });
+  if(!matches.length){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = `<div class="flag-hint" style="margin-top:-6px; margin-bottom:8px;">📋 From your cheat sheet: ${
+    matches.map(c=>{
+      const label = c.material || c.paperType || c.product;
+      return `<span class="badge gray" style="cursor:pointer;" onclick="useCheatMaterial('${escapeHtml(label).replace(/'/g,"\\'")}')" title="Click to use">${escapeHtml(label)}${c.gsm?' ('+escapeHtml(c.gsm)+'gsm)':''}</span>`;
+    }).join(' ')
+  }</div>`;
+}
+function useCheatMaterial(material){ qjMaterialOverride = material; toast('Using: '+material); }
+function applyQuickJob(){
+  const item = state.printProducts.find(p=>p.id===document.getElementById('qj_type').value);
+  if(!item){ toast('Pick a product first'); return; }
+  const quality = Number(document.getElementById('qj_quality').value)||1;
+  const qty = Number(document.getElementById('qj_qty').value)||1;
+  const minutesPerUnit = Number(document.getElementById('qj_minutes').value)||0;
+  const rate = Number(document.getElementById('qj_rate').value)||90;
+  const paperCost = Number(document.getElementById('qj_paperCost').value)||0;
+  const inkCost = Number(document.getElementById('qj_inkCost').value)||0;
+  const opCost = Number(document.getElementById('qj_opCost').value)||0;
+  const materialPerUnit = (paperCost + inkCost) * quality;
+  const opPerUnit = opCost;
+  const totalMinutes = minutesPerUnit * qty;
+  const materialName = qjMaterialOverride ? `${qjMaterialOverride} — ${item.category}: ${item.name}` : `Paper/Ink — ${item.category}: ${item.name}`;
+
+  costingDraft.materials = [{ name: materialName, qty: qty, price: Number(materialPerUnit.toFixed(2)) }];
+  costingDraft.operations = [{ name: 'Printer usage / electricity', amount: Number((opPerUnit*qty).toFixed(2)) }];
+  costingDraft.labor.rate = rate;
+  costingDraft.labor.hours = Math.floor(totalMinutes/60);
+  costingDraft.labor.minutes = Math.round(totalMinutes % 60);
+
+  document.getElementById('costProductName').value = item.name;
+  document.getElementById('costSize').value = item.category;
+  renderCostingRows();
+  toast('Applied — adjust any row below if needed');
+}
+
+/* ===================== CUSTOM / ASSEMBLED ITEM MODE ===================== */
+document.getElementById('qjModeTabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('#qjModeTabs .tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  const mode = t.dataset.mode;
+  document.getElementById('qjStandardPanel').style.display = mode==='standard' ? '' : 'none';
+  document.getElementById('qjCustomPanel').style.display = mode==='custom' ? '' : 'none';
+});
+let qjComponents = [{name:'Acrylic Case', cost:0},{name:'Keychain Materials', cost:0},{name:'Packaging', cost:0}];
+function renderQjComponents(){
+  document.getElementById('qjComponentsList').innerHTML = qjComponents.map((c,i)=>`
+    <div class="cost-row-2">
+      <input value="${escapeHtml(c.name)}" placeholder="Component name" oninput="updateQjComponent(${i},'name',this.value)">
+      <input type="number" step="any" value="${c.cost}" oninput="updateQjComponent(${i},'cost',this.value)">
+      <button class="icon-btn" onclick="removeQjComponent(${i})">🗑️</button>
+    </div>`).join('');
+}
+function updateQjComponent(i,field,val){ qjComponents[i][field] = field==='name' ? val : (Number(val)||0); }
+function addQjComponent(){ qjComponents.push({name:'',cost:0}); renderQjComponents(); }
+function removeQjComponent(i){ qjComponents.splice(i,1); renderQjComponents(); }
+function openComponentFromCatalog(){
+  const cats = {};
+  state.printProducts.forEach(p=>{ (cats[p.category]=cats[p.category]||[]).push(p); });
+  const optionsHtml = Object.entries(cats).map(([cat,items])=>
+    `<optgroup label="${escapeHtml(cat)}">${items.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</optgroup>`
+  ).join('');
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Add Print/Paper Component</h3>
+    <div class="field"><label>Print Product</label><select id="qjc_catalog">${optionsHtml}</select></div>
+    <div class="field"><label>Print Quality</label><select id="qjc_catalog_q"><option value="1" selected>Standard</option><option value="1.4">High</option></select></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="confirmAddCatalogComponent()">Add</button></div>`;
+  openModal();
+}
+function confirmAddCatalogComponent(){
+  const item = state.printProducts.find(p=>p.id===document.getElementById('qjc_catalog').value);
+  const q = Number(document.getElementById('qjc_catalog_q').value)||1;
+  if(!item) return;
+  const cost = (item.paper+item.ink)*q;
+  qjComponents.push({ name: `${item.category} — ${item.name}`, cost: Number(cost.toFixed(2)) });
+  renderQjComponents(); closeModal(); toast('Component added');
+}
+function applyCustomJob(){
+  const name = document.getElementById('qjc_name').value.trim() || 'Custom Item';
+  const opCost = Number(document.getElementById('qjc_op').value)||0;
+  const qty = Number(document.getElementById('qjc_qty').value)||1;
+  const minutesPerUnit = Number(document.getElementById('qjc_minutes').value)||0;
+  const rate = Number(document.getElementById('qjc_rate').value)||90;
+  const validComponents = qjComponents.filter(c=>c.name.trim());
+  costingDraft.materials = validComponents.length ? validComponents.map(c=>({ name:c.name, qty, price:c.cost })) : [{name:'Component', qty, price:0}];
+  costingDraft.operations = [{ name:'Electricity / Operation', amount: Number((opCost*qty).toFixed(2)) }];
+  costingDraft.labor.rate = rate;
+  const totalMinutes = minutesPerUnit*qty;
+  costingDraft.labor.hours = Math.floor(totalMinutes/60);
+  costingDraft.labor.minutes = Math.round(totalMinutes % 60);
+  document.getElementById('costProductName').value = name;
+  document.getElementById('costSize').value = 'Custom';
+  renderCostingRows();
+  toast('Applied — adjust any row below if needed');
+}
+
+/* ===================== QUOTATIONS ===================== */
+let quoteDraft = null;
+let currentQuote = null;
+function genQuoteNo(){ return 'QT-'+Math.floor(100000+Math.random()*900000); }
+function populatePrintProductSuggestions(){
+  document.getElementById('printProductSuggestions').innerHTML = state.printProducts.map(p=>`<option value="${escapeHtml(p.name)}">`).join('');
+}
+function renderQuotationsList(){
+  const body = document.getElementById('quotationsBody');
+  if(!state.quotations.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No quotations yet.</td></tr>`; return; }
+  body.innerHTML = state.quotations.map(q=>{
+    const total = q.items.reduce((a,it)=>a+it.qty*it.price,0);
+    return `<tr>
+      <td class="mono">${escapeHtml(q.quoteNo)}</td>
+      <td>${escapeHtml(q.customerName)}</td>
+      <td>${new Date(q.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+      <td>${peso(total)}</td>
+      <td><span class="badge ${q.status==='Finalized'?'green':'gray'}">${escapeHtml(q.status)}</span></td>
+      <td>
+        <button class="icon-btn" onclick="openQuoteBuilder('${q.id}')">✏️</button>
+        ${q.status==='Finalized'?`<button class="icon-btn" onclick="viewQuoteCardById('${q.id}')">🖼️</button>`:''}
+        <button class="icon-btn" onclick="deleteQuotation('${q.id}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function viewQuoteCardById(id){ const q = state.quotations.find(x=>x.id===id); if(q) showQuoteCard(q); }
+function openQuoteBuilder(id){
+  const existing = id ? state.quotations.find(q=>q.id===id) : null;
+  quoteDraft = existing ? JSON.parse(JSON.stringify(existing)) : { id:null, quoteNo:genQuoteNo(), customerName:'', company:'', preparedBy:'', items:[], status:'Draft', createdAt:new Date().toISOString() };
+  document.getElementById('qbTitle').textContent = existing ? 'Edit Quotation' : 'New Quotation';
+  document.getElementById('qbQuoteNo').textContent = quoteDraft.quoteNo;
+  document.getElementById('qbDate').textContent = new Date(quoteDraft.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('qb_customer').value = quoteDraft.customerName;
+  document.getElementById('qb_company').value = quoteDraft.company;
+  document.getElementById('qb_preparedby').value = quoteDraft.preparedBy;
+  populatePrintProductSuggestions();
+  renderQbItems();
+  document.getElementById('quoteListView').style.display='none';
+  document.getElementById('quoteBuilderView').style.display='';
+}
+function backToQuoteList(){
+  document.getElementById('quoteBuilderView').style.display='none';
+  document.getElementById('quoteListView').style.display='';
+  renderQuotationsList();
+}
+function renderQbItems(){
+  document.getElementById('qbItemsList').innerHTML = quoteDraft.items.length ? quoteDraft.items.map((it,i)=>`
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+      <div><div style="font-weight:600; font-size:13px;">${escapeHtml(it.description)}</div><div style="font-size:11px; color:var(--text-muted);">${it.qty} × ${peso(it.price)}</div></div>
+      <div style="display:flex; align-items:center; gap:8px;"><span style="font-weight:600;">${peso(it.qty*it.price)}</span><button class="icon-btn" onclick="removeQuoteItem(${i})">🗑️</button></div>
+    </div>`).join('') : `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:13px;">No items added yet.</div>`;
+  const total = quoteDraft.items.reduce((a,it)=>a+it.qty*it.price,0);
+  document.getElementById('qbGrandTotal').textContent = peso(total);
+}
+function addQuoteItem(){
+  const desc = document.getElementById('qb_new_desc').value.trim();
+  const qty = Number(document.getElementById('qb_new_qty').value)||1;
+  const price = Number(document.getElementById('qb_new_price').value)||0;
+  if(!desc){ toast('Enter a description'); return; }
+  quoteDraft.items.push({description:desc, qty, price});
+  document.getElementById('qb_new_desc').value=''; document.getElementById('qb_new_qty').value='1'; document.getElementById('qb_new_price').value='';
+  renderQbItems();
+}
+function removeQuoteItem(i){ quoteDraft.items.splice(i,1); renderQbItems(); }
+function pullQuoteFieldsFromForm(){
+  quoteDraft.customerName = document.getElementById('qb_customer').value.trim();
+  quoteDraft.company = document.getElementById('qb_company').value.trim();
+  quoteDraft.preparedBy = document.getElementById('qb_preparedby').value.trim();
+}
+function persistQuoteDraft(status){
+  quoteDraft.status = status;
+  if(quoteDraft.id){
+    const q = state.quotations.find(x=>x.id===quoteDraft.id);
+    Object.assign(q, quoteDraft);
+  } else {
+    quoteDraft.id = uid();
+    state.quotations.unshift({...quoteDraft});
+  }
+  saveAll();
+}
+function saveQuoteDraft(){
+  pullQuoteFieldsFromForm();
+  if(!quoteDraft.customerName){ toast('Customer name required'); return; }
+  persistQuoteDraft('Draft');
+  toast('Draft saved'); backToQuoteList();
+}
+function finalizeQuotation(){
+  pullQuoteFieldsFromForm();
+  if(!quoteDraft.customerName){ toast('Customer name required'); return; }
+  if(!quoteDraft.items.length){ toast('Add at least one item'); return; }
+  persistQuoteDraft('Finalized');
+  showQuoteCard(quoteDraft);
+}
+function deleteQuotation(id){
+  if(!confirm('Delete this quotation?')) return;
+  state.quotations = state.quotations.filter(q=>q.id!==id);
+  saveAll(); renderQuotationsList();
+}
+function showQuoteCard(q){
+  currentQuote = q;
+  const total = q.items.reduce((a,it)=>a+it.qty*it.price,0);
+  document.getElementById('quoteCardInner').innerHTML = `
+    <div style="background:#12130f; color:#fff; padding:24px; text-align:center;">
+      <div style="font-family:'Fraunces',serif; font-weight:700; font-size:18px; letter-spacing:.02em;">ARRA CREATIVE PRINTS</div>
+      <div style="font-size:11px; letter-spacing:.12em; color:#d4af5a; margin-top:4px;">OFFICIAL QUOTATION</div>
+    </div>
+    <div style="padding:20px 24px;">
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-bottom:16px;">
+        <div>QUOTE NO.<div style="color:#111; font-weight:700; font-size:13px;">${escapeHtml(q.quoteNo)}</div></div>
+        <div style="text-align:right;">DATE<div style="color:#111; font-weight:700; font-size:13px;">${new Date(q.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div></div>
+      </div>
+      <div style="font-size:11px; color:#888;">BILL TO</div>
+      <div style="font-weight:700; font-size:15px; color:#111; margin-bottom:8px;">${escapeHtml(q.customerName)}${q.company?' — '+escapeHtml(q.company):''}</div>
+      <div style="font-size:11px; color:#888;">STAFF</div>
+      <div style="font-size:13px; color:#111; margin-bottom:14px;">${escapeHtml(q.preparedBy||'—')}</div>
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; text-transform:uppercase; border-bottom:1px solid #ddd; padding-bottom:6px; margin-bottom:6px;">
+        <span>Qty / Description</span><span>Amount</span>
+      </div>
+      ${q.items.map(it=>`<div style="display:flex; justify-content:space-between; font-size:13px; color:#111; padding:5px 0;"><span>${it.qty} × ${escapeHtml(it.description)}</span><span>${peso(it.qty*it.price)}</span></div>`).join('')}
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#f3f3f3; border-radius:8px; padding:12px 14px; margin-top:14px;">
+        <span style="font-weight:700; font-size:13px; color:#111;">GRAND TOTAL</span>
+        <span style="font-weight:800; font-size:20px; color:#e8963c;">${peso(total)}</span>
+      </div>
+    </div>`;
+  document.getElementById('quoteCardOverlay').style.display='flex';
+}
+function closeQuoteCard(){ document.getElementById('quoteCardOverlay').style.display='none'; backToQuoteList(); }
+function saveQuoteImage(){
+  const node = document.getElementById('quoteCardInner');
+  html2canvas(node, {scale:3}).then(canvas=>{
+    const link = document.createElement('a'); link.download = (currentQuote?currentQuote.quoteNo:'quotation')+'.png'; link.href = canvas.toDataURL('image/png'); link.click();
+  });
+}
+function copyQuoteImage(){
+  const node = document.getElementById('quoteCardInner');
+  html2canvas(node, {scale:3}).then(canvas=>{
+    canvas.toBlob(blob=>{
+      if(!blob){ toast('Could not generate image'); return; }
+      if(navigator.clipboard && window.ClipboardItem){
+        navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
+          .then(()=>toast('Copied to clipboard'))
+          .catch(()=>toast('Copy not supported here — try Save Image instead'));
+      } else {
+        toast('Copy not supported here — try Save Image instead');
+      }
+    });
+  });
+}
+function convertQuoteToJobOrder(){
+  if(!currentQuote){ toast('Nothing to convert'); return; }
+  const q = currentQuote;
+  document.getElementById('quoteCardOverlay').style.display='none';
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelector('.nav-item[data-page="joborders"]').classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-joborders').classList.add('active');
+  openJobOrderBuilder(null, q);
+  toast('Quotation converted — review the details below, then click Create Job Order to save it');
+}
+
+/* ===================== JOB ORDERS ===================== */
+let jobOrderDraft = null;
+let joActiveFilter = 'All';
+function peekJobOrderNo(){ return 'JO-'+state.counters.jobOrderSeq; }
+function commitJobOrderNo(){ const n = peekJobOrderNo(); state.counters.jobOrderSeq++; return n; }
+document.getElementById('joFilterTabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('#joFilterTabs .tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  joActiveFilter = t.dataset.filter;
+  renderJobOrdersList();
+});
+document.getElementById('joDeliveryTabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('#joDeliveryTabs .tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+});
+function renderJoStats(){
+  document.getElementById('joStatPending').textContent = state.jobOrders.filter(j=>j.productionStatus==='Pending').length;
+  document.getElementById('joStatProgress').textContent = state.jobOrders.filter(j=>j.productionStatus==='In Progress').length;
+  document.getElementById('joStatDone').textContent = state.jobOrders.filter(j=>j.productionStatus==='Done').length;
+  const toCollect = state.jobOrders.filter(j=>j.paymentStatus==='Unpaid')
+    .reduce((a,j)=> a + Math.max(0, j.items.reduce((s,it)=>s+it.qty*it.price,0) - (j.amountPaid||0)), 0);
+  document.getElementById('joStatCollect').textContent = peso(toCollect);
+}
+function renderJobOrdersList(){
+  const q = (document.getElementById('joSearch').value||'').toLowerCase();
+  let items = state.jobOrders;
+  if(joActiveFilter==='Pending') items = items.filter(j=>j.productionStatus==='Pending');
+  else if(joActiveFilter==='In Progress') items = items.filter(j=>j.productionStatus==='In Progress');
+  else if(joActiveFilter==='Done') items = items.filter(j=>j.productionStatus==='Done');
+  else if(joActiveFilter==='Rush') items = items.filter(j=>j.isRush);
+  else if(joActiveFilter==='Unpaid') items = items.filter(j=>j.paymentStatus==='Unpaid');
+  if(q) items = items.filter(j=>(j.orderNo+' '+j.customerName).toLowerCase().includes(q));
+  const body = document.getElementById('jobOrdersBody');
+  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No job orders found.</td></tr>`; return; }
+  body.innerHTML = items.map(j=>{
+    const total = j.items.reduce((a,it)=>a+it.qty*it.price,0);
+    const manifest = j.items.map(it=>`${it.qty}× ${it.description}`).join(', ');
+    return `<tr>
+      <td><div style="font-weight:600;">${escapeHtml(j.orderNo)}${j.isRush?' <span class="badge red">RUSH</span>':''}</div><div style="font-size:12px; color:var(--text-muted);">${escapeHtml(j.customerName)}</div></td>
+      <td style="max-width:220px;">${escapeHtml(manifest)||'—'}</td>
+      <td>${j.dueDate||'—'}</td>
+      <td><span class="badge ${j.productionStatus==='Done'?'green':j.productionStatus==='In Progress'?'orange':'gray'}">${escapeHtml(j.productionStatus)}</span> <span class="badge ${j.paymentStatus==='Paid'?'green':'red'}">${escapeHtml(j.paymentStatus)}</span></td>
+      <td>${peso(total)}</td>
+      <td><button class="icon-btn" onclick="openJobOrderBuilder('${j.id}')">✏️</button><button class="icon-btn" onclick="deleteJobOrder('${j.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+function openJobOrderBuilder(id, fromQuote){
+  const existing = id ? state.jobOrders.find(j=>j.id===id) : null;
+  if(existing){
+    jobOrderDraft = JSON.parse(JSON.stringify(existing));
+  } else if(fromQuote){
+    jobOrderDraft = { id:null, orderNo:peekJobOrderNo(), dueDate:'', isRush:false, customerName:fromQuote.customerName, phone:'', address:'', socials:'',
+      items: fromQuote.items.map(it=>({description:it.description, price:it.price, qty:it.qty})),
+      productionStatus:'Pending', paymentStatus:'Unpaid', method:'Cash', amountPaid:0, deliveryMethod:'Pickup', notes:'Converted from quotation '+fromQuote.quoteNo, createdAt:new Date().toISOString() };
+  } else {
+    jobOrderDraft = { id:null, orderNo:peekJobOrderNo(), dueDate:'', isRush:false, customerName:'', phone:'', address:'', socials:'', items:[],
+      productionStatus:'Pending', paymentStatus:'Unpaid', method:'Cash', amountPaid:0, deliveryMethod:'Pickup', notes:'', createdAt:new Date().toISOString() };
+  }
+  document.getElementById('joTitle').textContent = existing ? 'Edit '+existing.orderNo : 'New Job Order';
+  document.getElementById('jo_orderno').value = jobOrderDraft.orderNo;
+  document.getElementById('jo_duedate').value = jobOrderDraft.dueDate;
+  document.getElementById('jo_rush').checked = jobOrderDraft.isRush;
+  document.getElementById('jo_customer').value = jobOrderDraft.customerName;
+  document.getElementById('jo_phone').value = jobOrderDraft.phone;
+  document.getElementById('jo_address').value = jobOrderDraft.address;
+  document.getElementById('jo_socials').value = jobOrderDraft.socials;
+  document.getElementById('jo_prodstatus').value = jobOrderDraft.productionStatus;
+  document.getElementById('jo_paystatus').value = jobOrderDraft.paymentStatus;
+  document.getElementById('jo_method').value = jobOrderDraft.method;
+  document.getElementById('jo_amountpaid').value = jobOrderDraft.amountPaid;
+  document.getElementById('jo_notes').value = jobOrderDraft.notes;
+  document.querySelectorAll('#joDeliveryTabs .tab').forEach(t=>t.classList.toggle('active', t.dataset.val===jobOrderDraft.deliveryMethod));
+  document.getElementById('joSaveBtn').textContent = existing ? 'Update Job Order' : 'Create Job Order';
+  populatePrintProductSuggestions();
+  renderJoItems();
+  document.getElementById('joListView').style.display='none';
+  document.getElementById('joBuilderView').style.display='';
+}
+function backToJoList(){
+  document.getElementById('joBuilderView').style.display='none';
+  document.getElementById('joListView').style.display='';
+  renderJobOrdersList(); renderJoStats();
+}
+function renderJoItems(){
+  document.getElementById('joItemsList').innerHTML = jobOrderDraft.items.length ? jobOrderDraft.items.map((it,i)=>`
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+      <div><div style="font-weight:600; font-size:13px;">${escapeHtml(it.description)}</div><div style="font-size:11px; color:var(--text-muted);">${it.qty} × ${peso(it.price)}</div></div>
+      <div style="display:flex; align-items:center; gap:8px;"><span style="font-weight:600;">${peso(it.qty*it.price)}</span><button class="icon-btn" onclick="removeJoItem(${i})">🗑️</button></div>
+    </div>`).join('') : `<div style="text-align:center; color:var(--text-muted); padding:16px; font-size:13px;">No items added yet.</div>`;
+  const total = jobOrderDraft.items.reduce((a,it)=>a+it.qty*it.price,0);
+  document.getElementById('joTotalValuation').textContent = peso(total);
+}
+function addJoItem(){
+  const desc = document.getElementById('jo_new_desc').value.trim();
+  const price = Number(document.getElementById('jo_new_price').value)||0;
+  const qty = Number(document.getElementById('jo_new_qty').value)||1;
+  if(!desc){ toast('Enter item / product'); return; }
+  jobOrderDraft.items.push({description:desc, price, qty});
+  document.getElementById('jo_new_desc').value=''; document.getElementById('jo_new_price').value=''; document.getElementById('jo_new_qty').value='1';
+  renderJoItems();
+}
+function removeJoItem(i){ jobOrderDraft.items.splice(i,1); renderJoItems(); }
+function saveJobOrder(){
+  jobOrderDraft.dueDate = document.getElementById('jo_duedate').value;
+  jobOrderDraft.isRush = document.getElementById('jo_rush').checked;
+  jobOrderDraft.customerName = document.getElementById('jo_customer').value.trim();
+  jobOrderDraft.phone = document.getElementById('jo_phone').value.trim();
+  jobOrderDraft.address = document.getElementById('jo_address').value.trim();
+  jobOrderDraft.socials = document.getElementById('jo_socials').value.trim();
+  jobOrderDraft.productionStatus = document.getElementById('jo_prodstatus').value;
+  jobOrderDraft.paymentStatus = document.getElementById('jo_paystatus').value;
+  jobOrderDraft.method = document.getElementById('jo_method').value;
+  jobOrderDraft.amountPaid = Number(document.getElementById('jo_amountpaid').value)||0;
+  jobOrderDraft.notes = document.getElementById('jo_notes').value.trim();
+  jobOrderDraft.deliveryMethod = document.querySelector('#joDeliveryTabs .tab.active').dataset.val;
+  if(!jobOrderDraft.customerName){ toast('Customer name required'); return; }
+  if(!jobOrderDraft.items.length){ toast('Add at least one item'); return; }
+  if(jobOrderDraft.id){
+    const j = state.jobOrders.find(x=>x.id===jobOrderDraft.id);
+    Object.assign(j, jobOrderDraft);
+  } else {
+    jobOrderDraft.orderNo = commitJobOrderNo();
+    jobOrderDraft.id = uid();
+    state.jobOrders.unshift({...jobOrderDraft});
+  }
+  saveAll();
+  toast('Job order saved'); backToJoList();
+}
+function deleteJobOrder(id){
+  if(!confirm('Delete this job order?')) return;
+  state.jobOrders = state.jobOrders.filter(j=>j.id!==id);
+  saveAll(); renderJobOrdersList(); renderJoStats();
+}
+function exportJobOrdersCsv(){
+  const rows = [['Order No','Customer','Phone','Due Date','Rush','Manifest','Production Status','Payment Status','Total','Amount Paid']];
+  state.jobOrders.forEach(j=>{
+    const total = j.items.reduce((a,it)=>a+it.qty*it.price,0);
+    rows.push([j.orderNo, j.customerName, j.phone, j.dueDate, j.isRush?'Yes':'No', j.items.map(it=>`${it.qty}x ${it.description}`).join('; '), j.productionStatus, j.paymentStatus, total, j.amountPaid]);
+  });
+  const csv = rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const link = document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='job-orders-'+todayStr()+'.csv'; link.click();
+}
+
+/* ===================== MANAGE PRODUCTS (catalog CRUD) ===================== */
+function renderPrintProducts(){
+  const body = document.getElementById('printProductsBody');
+  if(!state.printProducts.length){ body.innerHTML = `<tr class="empty-row"><td colspan="7">No products yet — add your first one.</td></tr>`; return; }
+  body.innerHTML = state.printProducts.map(p=>`<tr>
+    <td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.name)}</td><td>${peso(p.paper)}</td><td>${peso(p.ink)}</td><td>${peso(p.op)}</td><td>${p.minutes}</td>
+    <td><button class="icon-btn" onclick="openProductTemplateModal('${p.id}')">✏️</button><button class="icon-btn" onclick="deleteProductTemplate('${p.id}')">🗑️</button></td>
+  </tr>`).join('');
+}
+function openProductTemplateModal(id){
+  const p = id ? state.printProducts.find(x=>x.id===id) : null;
+  const categories = [...new Set(state.printProducts.map(x=>x.category))];
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${p?'Edit':'Add'} Product</h3>
+    <div class="field"><label>Category</label><input id="pt_category" list="pt_categoryList" value="${p?escapeHtml(p.category):''}" placeholder="e.g. Photoprint (existing or new)"></div>
+    <datalist id="pt_categoryList">${categories.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <div class="field"><label>Product Name</label><input id="pt_name" value="${p?escapeHtml(p.name):''}" placeholder="e.g. 4R Size"></div>
+    <div class="field-row">
+      <div class="field"><label>Paper Cost (₱/unit)</label><input id="pt_paper" type="number" step="any" value="${p?p.paper:0}"></div>
+      <div class="field"><label>Ink Cost (₱/unit)</label><input id="pt_ink" type="number" step="any" value="${p?p.ink:0}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Operation Cost (₱/unit)</label><input id="pt_op" type="number" step="any" value="${p?p.op:0}"></div>
+      <div class="field"><label>Est. Minutes/unit</label><input id="pt_minutes" type="number" step="any" value="${p?p.minutes:0.3}"></div>
+    </div>
+    <div class="modal-actions">
+      ${p?`<button class="btn danger" onclick="deleteProductTemplate('${p.id}', true)">Delete</button>`:''}
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveProductTemplate(${p?`'${p.id}'`:'null'})">Save</button>
+    </div>`;
+  openModal();
+}
+function saveProductTemplate(id){
+  const category = document.getElementById('pt_category').value.trim();
+  const name = document.getElementById('pt_name').value.trim();
+  if(!category || !name){ toast('Category and name are required'); return; }
+  const payload = {
+    category, name,
+    paper: Number(document.getElementById('pt_paper').value)||0,
+    ink: Number(document.getElementById('pt_ink').value)||0,
+    op: Number(document.getElementById('pt_op').value)||0,
+    minutes: Number(document.getElementById('pt_minutes').value)||0,
+  };
+  if(id){ const p = state.printProducts.find(x=>x.id===id); Object.assign(p, payload); }
+  else { state.printProducts.push({ id: uid(), ...payload }); }
+  saveAll(); closeModal(); toast('Product saved'); buildProductSelect(); renderPrintProducts(); renderCheatSheetHints(); populatePrintProductSuggestions();
+}
+function deleteProductTemplate(id, fromModal){
+  if(!confirm('Delete this product?')) return;
+  state.printProducts = state.printProducts.filter(p=>p.id!==id);
+  saveAll();
+  if(fromModal) closeModal();
+  toast('Deleted'); buildProductSelect(); renderPrintProducts(); renderCheatSheetHints(); populatePrintProductSuggestions();
+}
+
+/* ===================== MATERIALS CHEAT SHEET ===================== */
+function renderCheatSheet(){
+  const body = document.getElementById('cheatSheetBody');
+  if(!state.cheatSheet.length){ body.innerHTML = `<tr class="empty-row"><td colspan="8">No entries yet — add your first product/material pairing.</td></tr>`; return; }
+  body.innerHTML = state.cheatSheet.map(c=>`<tr>
+    <td>${escapeHtml(c.product)}</td>
+    <td>${escapeHtml(c.material||'—')}</td>
+    <td>${c.gsm?escapeHtml(c.gsm)+'gsm':'—'}</td>
+    <td>${escapeHtml(c.paperType||'—')} <span class="badge ${c.printQuality==='High'?'orange':'gray'}">${escapeHtml(c.printQuality||'Standard')}</span></td>
+    <td>${escapeHtml(c.inkType||'—')}</td>
+    <td>${escapeHtml(c.packaging||'—')}</td>
+    <td>${escapeHtml(c.notes||'—')}</td>
+    <td><button class="icon-btn" onclick="openCheatSheetModal('${c.id}')">✏️</button><button class="icon-btn" onclick="deleteCheatSheetItem('${c.id}')">🗑️</button></td>
+  </tr>`).join('');
+}
+function openCheatSheetModal(id){
+  const c = id ? state.cheatSheet.find(x=>x.id===id) : null;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${c?'Edit':'Add'} Cheat Sheet Entry</h3>
+    <div class="field"><label>Product</label><input id="cs_product" value="${c?escapeHtml(c.product):''}" placeholder="e.g. Rush ID"></div>
+    <div class="field"><label>Material / Paper</label><input id="cs_material" value="${c?escapeHtml(c.material||''):''}" placeholder="e.g. CUYI RC Satin"></div>
+    <div class="field-row">
+      <div class="field"><label>GSM</label><input id="cs_gsm" value="${c?escapeHtml(c.gsm||''):''}" placeholder="e.g. 200"></div>
+      <div class="field"><label>Print Quality</label><select id="cs_quality"><option value="Standard" ${c&&c.printQuality==='Standard'?'selected':''}>Standard</option><option value="High" ${c&&c.printQuality==='High'?'selected':''}>High</option></select></div>
+    </div>
+    <div class="field"><label>Paper Type</label><input id="cs_papertype" value="${c?escapeHtml(c.paperType||''):''}" placeholder="e.g. RC Satin, Bond Paper"></div>
+    <div class="field-row">
+      <div class="field"><label>Ink Type</label><input id="cs_ink" value="${c?escapeHtml(c.inkType||''):''}" placeholder="e.g. Pigment Ink"></div>
+      <div class="field"><label>Packaging Size</label><input id="cs_packaging" value="${c?escapeHtml(c.packaging||''):''}" placeholder="e.g. 12 pcs/pack"></div>
+    </div>
+    <div class="field"><label>Notes</label><input id="cs_notes" value="${c?escapeHtml(c.notes||''):''}" placeholder="Pricing, sourcing, anything else"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCheatSheetItem(${c?`'${c.id}'`:'null'})">Save</button></div>`;
+  openModal();
+}
+function saveCheatSheetItem(id){
+  const product = document.getElementById('cs_product').value.trim();
+  if(!product){ toast('Product is required'); return; }
+  const payload = {
+    product,
+    material: document.getElementById('cs_material').value.trim(),
+    gsm: document.getElementById('cs_gsm').value.trim(),
+    printQuality: document.getElementById('cs_quality').value,
+    paperType: document.getElementById('cs_papertype').value.trim(),
+    inkType: document.getElementById('cs_ink').value.trim(),
+    packaging: document.getElementById('cs_packaging').value.trim(),
+    notes: document.getElementById('cs_notes').value.trim(),
+  };
+  if(id){ const c = state.cheatSheet.find(x=>x.id===id); Object.assign(c, payload); }
+  else { state.cheatSheet.unshift({ id: uid(), ...payload }); }
+  saveAll(); closeModal(); toast('Saved'); renderCheatSheet(); renderCheatSheetHints();
+}
+function deleteCheatSheetItem(id){
+  if(!confirm('Delete this entry?')) return;
+  state.cheatSheet = state.cheatSheet.filter(c=>c.id!==id);
+  saveAll(); renderCheatSheet(); renderCheatSheetHints();
+}
+
+/* ===================== STICKER GUIDES ===================== */
+function renderStickerGuides(){
+  const grid = document.getElementById('stickerGuidesGrid');
+  if(!state.stickerGuides.length){ grid.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:30px;">No guides yet — add your first note.</div>`; return; }
+  grid.innerHTML = state.stickerGuides.map(g=>`
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px;">
+        <h3 style="font-size:14px;">${escapeHtml(g.title)}</h3>
+        <div style="display:flex; gap:2px; flex-shrink:0;">
+          <button class="icon-btn" onclick="openStickerGuideModal('${g.id}')">✏️</button>
+          <button class="icon-btn" onclick="deleteStickerGuide('${g.id}')">🗑️</button>
+        </div>
+      </div>
+      <div style="font-size:13px; color:var(--text-muted); line-height:1.6; white-space:pre-wrap;">${escapeHtml(g.details)}</div>
+    </div>`).join('');
+}
+function openStickerGuideModal(id){
+  const g = id ? state.stickerGuides.find(x=>x.id===id) : null;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${g?'Edit':'Add'} Guide</h3>
+    <div class="field"><label>Title</label><input id="sg_title" value="${g?escapeHtml(g.title):''}" placeholder="e.g. Common Sticker Sizes"></div>
+    <div class="field"><label>Details</label><textarea id="sg_details" rows="5" placeholder="Notes, tips, sizes, paper picks...">${g?escapeHtml(g.details):''}</textarea></div>
+    <div class="modal-actions">
+      ${g?`<button class="btn danger" onclick="deleteStickerGuide('${g.id}', true)">Delete</button>`:''}
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveStickerGuide(${g?`'${g.id}'`:'null'})">Save</button>
+    </div>`;
+  openModal();
+}
+function saveStickerGuide(id){
+  const title = document.getElementById('sg_title').value.trim();
+  if(!title){ toast('Title is required'); return; }
+  const payload = { title, details: document.getElementById('sg_details').value.trim() };
+  if(id){ const g = state.stickerGuides.find(x=>x.id===id); Object.assign(g, payload); }
+  else { state.stickerGuides.unshift({ id: uid(), ...payload }); }
+  saveAll(); closeModal(); toast('Saved'); renderStickerGuides();
+}
+function deleteStickerGuide(id, fromModal){
+  if(!confirm('Delete this guide?')) return;
+  state.stickerGuides = state.stickerGuides.filter(g=>g.id!==id);
+  saveAll();
+  if(fromModal) closeModal();
+  toast('Deleted'); renderStickerGuides();
+}
+
+/* ===================== PRINTING RESTOCK (supplier catalog) ===================== */
+let psActiveCategory = 'All';
+document.getElementById('psTabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('#psTabs .tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  psActiveCategory = t.dataset.cat;
+  renderPrintSupplies();
+});
+function renderPrintSupplies(){
+  const grid = document.getElementById('printSuppliesGrid');
+  const q = (document.getElementById('psSearch').value||'').toLowerCase();
+  let items = state.printSupplies;
+  if(psActiveCategory!=='All') items = items.filter(s=>s.category===psActiveCategory);
+  if(q) items = items.filter(s=>(s.name+' '+s.description).toLowerCase().includes(q));
+  if(!items.length){ grid.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:30px;">No supplies added yet.</div>`; return; }
+  grid.innerHTML = items.map(s=>`
+    <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column;">
+      <div style="width:100%; aspect-ratio:1; background:var(--surface-2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
+        ${s.image?`<img src="${s.image}" style="width:100%; height:100%; object-fit:cover;">`:'<span style="font-size:36px; opacity:.4;">🖼️</span>'}
+      </div>
+      <div style="padding:12px 14px; flex:1; display:flex; flex-direction:column;">
+        <span class="badge gray" style="width:fit-content; margin-bottom:6px;">${escapeHtml(s.category||'Uncategorized')}</span>
+        <div style="font-weight:600; font-size:13.5px; margin-bottom:4px;">${escapeHtml(s.name)}</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.5; margin-bottom:8px; flex:1;">${escapeHtml(s.description||'')}</div>
+        ${s.location?`<div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">📍 ${escapeHtml(s.location)}</div>`:''}
+        <div style="display:flex; gap:6px;">
+          <button class="btn small" style="flex:1; justify-content:center;" onclick="${s.link?`window.open('${escapeHtml(s.link)}','_blank')`:`toast('No link added yet')`}">🔗 View Deal</button>
+          <button class="icon-btn" onclick="openSupplyModal('${s.id}')">✏️</button>
+          <button class="icon-btn" onclick="deleteSupply('${s.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+let supplyImageDraft = null;
+function onSupplyImageUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ supplyImageDraft = reader.result; toast('Image loaded'); };
+  reader.readAsDataURL(file);
+}
+function openSupplyModal(id){
+  const s = id ? state.printSupplies.find(x=>x.id===id) : null;
+  supplyImageDraft = s ? s.image : null;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${s?'Edit':'Add'} Supply</h3>
+    <div class="field"><label>Product Name</label><input id="sp_name" value="${s?escapeHtml(s.name):''}" placeholder="e.g. RC Satin Photo Paper"></div>
+    <div class="field"><label>Category</label>
+      <select id="sp_category">
+        <option ${s&&s.category==='Packaging Materials'?'selected':''}>Packaging Materials</option>
+        <option ${s&&s.category==='Papers & Cards'?'selected':''}>Papers &amp; Cards</option>
+        <option ${s&&s.category==='Tools & Accessories'?'selected':''}>Tools &amp; Accessories</option>
+      </select>
+    </div>
+    <div class="field"><label>Description</label><textarea id="sp_desc" rows="3">${s?escapeHtml(s.description||''):''}</textarea></div>
+    <div class="field"><label>Product Image</label><input type="file" accept="image/*" onchange="onSupplyImageUpload(event)"></div>
+    <div class="field"><label>Buy Link (URL)</label><input id="sp_link" value="${s?escapeHtml(s.link||''):''}" placeholder="https://..."></div>
+    <div class="field"><label>Location / Store</label><input id="sp_location" value="${s?escapeHtml(s.location||''):''}" placeholder="e.g. Lazada — Yopsun Official Store"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveSupply(${s?`'${s.id}'`:'null'})">Save</button></div>`;
+  openModal();
+}
+function saveSupply(id){
+  const name = document.getElementById('sp_name').value.trim();
+  if(!name){ toast('Product name required'); return; }
+  const payload = {
+    name, category: document.getElementById('sp_category').value,
+    description: document.getElementById('sp_desc').value.trim(),
+    image: supplyImageDraft, link: document.getElementById('sp_link').value.trim(),
+    location: document.getElementById('sp_location').value.trim(),
+  };
+  if(id){ const s = state.printSupplies.find(x=>x.id===id); Object.assign(s, payload); }
+  else { state.printSupplies.unshift({ id: uid(), ...payload }); }
+  saveAll(); closeModal(); toast('Saved'); renderPrintSupplies();
+}
+function deleteSupply(id){
+  if(!confirm('Delete this supply?')) return;
+  state.printSupplies = state.printSupplies.filter(s=>s.id!==id);
+  saveAll(); toast('Deleted'); renderPrintSupplies();
+}
+
+/* ===================== PRINTING COSTING ===================== */
+let costingDraft = { materials:[{name:'',qty:1,price:0}], operations:[{name:'',amount:0}], labor:{rate:90,hours:0,minutes:0}, margin:50 };
+function initCostingRows(){ renderCostingRows(); }
+function renderCostingRows(){
+  document.getElementById('matRows').innerHTML = costingDraft.materials.map((m,i)=>`
+    <div class="cost-row">
+      <input placeholder="Item name" value="${escapeHtml(m.name)}" oninput="updateMaterial(${i},'name',this.value)">
+      <input type="number" step="any" value="${m.qty}" oninput="updateMaterial(${i},'qty',this.value)">
+      <input type="number" step="any" value="${m.price}" oninput="updateMaterial(${i},'price',this.value)">
+      <button class="icon-btn" onclick="removeMaterial(${i})">🗑️</button>
+    </div>`).join('');
+  document.getElementById('opRows').innerHTML = costingDraft.operations.map((o,i)=>`
+    <div class="cost-row-2">
+      <input placeholder="Operation item" value="${escapeHtml(o.name)}" oninput="updateOperation(${i},'name',this.value)">
+      <input type="number" step="any" value="${o.amount}" oninput="updateOperation(${i},'amount',this.value)">
+      <button class="icon-btn" onclick="removeOperation(${i})">🗑️</button>
+    </div>`).join('');
+  document.getElementById('laborRate').value = costingDraft.labor.rate;
+  document.getElementById('laborHours').value = costingDraft.labor.hours;
+  document.getElementById('laborMinutes').value = costingDraft.labor.minutes;
+  document.getElementById('marginSlider').value = costingDraft.margin;
+  renderCostingSummary();
+}
+function updateMaterial(i,field,val){ costingDraft.materials[i][field] = field==='name'?val:Number(val)||0; renderCostingSummary(); }
+function addMaterial(){ costingDraft.materials.push({name:'',qty:1,price:0}); renderCostingRows(); }
+function removeMaterial(i){ costingDraft.materials.splice(i,1); renderCostingRows(); }
+function updateOperation(i,field,val){ costingDraft.operations[i][field] = field==='name'?val:Number(val)||0; renderCostingSummary(); }
+function addOperation(){ costingDraft.operations.push({name:'',amount:0}); renderCostingRows(); }
+function removeOperation(i){ costingDraft.operations.splice(i,1); renderCostingRows(); }
+function updateLabor(field,val){ costingDraft.labor[field]=Number(val)||0; renderCostingSummary(); }
+function updateMargin(val){ costingDraft.margin=Number(val); document.getElementById('marginLabel').textContent = val+'%'; renderCostingSummary(); }
+function renderCostingSummary(){
+  const matTotal = costingDraft.materials.reduce((a,m)=>a+(m.qty*m.price),0);
+  const opTotal = costingDraft.operations.reduce((a,o)=>a+o.amount,0);
+  const laborTotal = costingDraft.labor.rate*(costingDraft.labor.hours+costingDraft.labor.minutes/60);
+  const baseCost = matTotal+opTotal+laborTotal;
+  document.getElementById('matTotal').textContent = peso(matTotal);
+  document.getElementById('opTotal').textContent = peso(opTotal);
+  document.getElementById('laborTotal').textContent = peso(laborTotal);
+  document.getElementById('baseCost').textContent = peso(baseCost);
+  const margins=[5,25,50,75,100];
+  document.getElementById('marginMatrix').innerHTML = margins.map(m=>{ const profit=baseCost*(m/100); return `<tr><td>${peso(baseCost)}</td><td><span class="badge gray">${m}%</span></td><td>+${peso(profit)}</td><td>${peso(baseCost+profit)}</td></tr>`; }).join('');
+  const targetPrice = baseCost*(1+costingDraft.margin/100);
+  document.getElementById('targetPrice').textContent = peso(targetPrice);
+  const discount = Number(document.getElementById('bulkDiscount')?.value)||0;
+  const qty = Number(document.getElementById('bulkQty')?.value)||1;
+  document.getElementById('bulkBase').textContent = peso(targetPrice);
+  document.getElementById('bulkFinal').textContent = peso((targetPrice-discount)*qty);
+  window._lastBaseCost = baseCost; window._lastTargetPrice = targetPrice;
+}
+function saveCosting(){
+  const name = document.getElementById('costProductName').value.trim()||'Untitled';
+  const size = document.getElementById('costSize').value.trim()||'—';
+  state.costings.unshift({ id: uid(), name, size, baseCost: window._lastBaseCost||0, targetPrice: window._lastTargetPrice||0 });
+  saveAll(); renderCostingsList(); toast('Costing saved');
+}
+function renderCostingsList(){
+  const body = document.getElementById('costingsBody');
+  if(!state.costings.length){ body.innerHTML = `<tr class="empty-row"><td colspan="5">No saved costings yet.</td></tr>`; return; }
+  body.innerHTML = state.costings.map(c=>`<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.size)}</td><td>${peso(c.baseCost)}</td><td>${peso(c.targetPrice)}</td>
+    <td><button class="icon-btn" onclick="deleteCosting('${c.id}')">🗑️</button></td></tr>`).join('');
+}
+function deleteCosting(id){ state.costings = state.costings.filter(c=>c.id!==id); saveAll(); renderCostingsList(); }
+
+/* ===================== RUSH ID (mixed-size packages) ===================== */
+let ridPhoto = null;
+let ridPaperKey = '4x6';
+let ridMargin = 0.12;
+let ridGap = 0.05;
+let ridGroups = [{count:6, w:2, h:2}];
+const paperSizes = {'4x6':[4,6], '5x7':[5,7], '8.5x11':[8.5,11], '8.27x11.69':[8.27,11.69]};
+const ridPackagePresets = {
+  pkg1: { paper:'4x6', groups:[{count:12,w:1,h:1}] },
+  pkg2: { paper:'4x6', groups:[{count:2,w:2,h:2},{count:4,w:1,h:1}] },
+  pkg3: { paper:'5x7', groups:[{count:2,w:2,h:2},{count:8,w:1,h:1}] },
+  pkg4: { paper:'5x7', groups:[{count:6,w:2,h:2}] },
+  pkg5: { paper:'5x7', groups:[{count:4,w:2,h:2},{count:8,w:1,h:1}] },
+  pkg6: { paper:'5x7', groups:[{count:9,w:1.4,h:1.8}] },
+};
+document.getElementById('ridPresets').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('#ridPresets .tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  const p = ridPackagePresets[t.dataset.preset];
+  ridPaperKey = p.paper; document.getElementById('ridPaper').value = p.paper;
+  ridGroups = p.groups.map(g=>({...g}));
+  renderRidGroups();
+});
+function onRidPaperChange(){ ridPaperKey = document.getElementById('ridPaper').value; renderRushId(); }
+function onRidSpacingChange(){ ridMargin = Number(document.getElementById('ridMargin').value)||0; ridGap = Number(document.getElementById('ridGap').value)||0; renderRushId(); }
+function onRidPhotoUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader(); reader.onload = ()=>{ ridPhoto = reader.result; renderRushId(); }; reader.readAsDataURL(file);
+}
+function renderRidGroups(){
+  document.getElementById('ridGroupsList').innerHTML = ridGroups.map((g,i)=>`
+    <div class="rid-group-row" style="grid-template-columns:0.6fr 0.65fr 0.65fr auto;">
+      <input type="number" value="${g.count}" oninput="updateRidGroup(${i},'count',this.value)">
+      <input type="number" step="0.1" value="${g.w}" oninput="updateRidGroup(${i},'w',this.value)">
+      <input type="number" step="0.1" value="${g.h}" oninput="updateRidGroup(${i},'h',this.value)">
+      <button class="icon-btn" onclick="removeRidGroup(${i})">🗑️</button>
+    </div>`).join('');
+  renderRushId();
+}
+function updateRidGroup(i,field,val){ ridGroups[i][field]=Number(val)||0; renderRushId(); }
+function addRidGroup(){ ridGroups.push({count:4,w:1,h:1}); renderRidGroups(); }
+function removeRidGroup(i){ ridGroups.splice(i,1); renderRidGroups(); }
+function renderRushId(){
+  const paper = paperSizes[ridPaperKey];
+  const usableW = paper[0] - ridMargin*2;
+  let blocksHtml = '';
+  ridGroups.forEach(g=>{
+    const cols = Math.max(1, Math.floor((usableW+ridGap)/(g.w+ridGap)));
+    let cellsHtml = '';
+    for(let i=0;i<g.count;i++){ cellsHtml += `<div class="rid-cell" style="width:${g.w}in; height:${g.h}in;">${ridPhoto?`<img src="${ridPhoto}">`:''}</div>`; }
+    blocksHtml += `<div style="display:grid; grid-template-columns:repeat(${cols}, ${g.w}in); gap:${ridGap}in; margin-bottom:${ridGap}in;">${cellsHtml}</div>`;
+  });
+  document.getElementById('ridPage').innerHTML = `
+    <div id="ridPageInner" style="width:${paper[0]}in; min-height:${paper[1]}in; background:#fff; padding:${ridMargin}in; box-sizing:border-box; border:1px solid #444;">${blocksHtml}</div>`;
+}
+function exportRushIdPng(){
+  const node = document.getElementById('ridPageInner');
+  if(!node){ toast('Nothing to export'); return; }
+  html2canvas(node, {scale:3}).then(canvas=>{
+    const link = document.createElement('a'); link.download='rush-id-layout.png'; link.href = canvas.toDataURL('image/png'); link.click();
+  });
+}
+
+/* ===================== STICKER LAYOUT TOOL (same mechanism as Rush ID) ===================== */
+let sgPhoto = null;
+let sgMode = 'fit';
+document.getElementById('sgModeTabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('#sgModeTabs .tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  sgMode = t.dataset.mode;
+  document.getElementById('sgTileFields').style.display = sgMode==='tile' ? '' : 'none';
+  sgRender();
+});
+function sgOnPhotoUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader(); reader.onload = ()=>{ sgPhoto = reader.result; sgRender(); }; reader.readAsDataURL(file);
+}
+function sgOnChange(){ sgRender(); }
+function sgRender(){
+  const paperKey = document.getElementById('sgPaper').value;
+  const paper = paperSizes[paperKey];
+  const fitCountEl = document.getElementById('sgFitCount');
+  let inner;
+  if(sgMode==='fit'){
+    fitCountEl.textContent = '';
+    inner = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:0.12in; box-sizing:border-box;">${sgPhoto?`<img src="${sgPhoto}" style="max-width:100%; max-height:100%; object-fit:contain;">`:'<span style="color:#999; font-size:12px;">Upload an image to preview</span>'}</div>`;
+    document.getElementById('sgPage').innerHTML = `<div id="sgPageInner" style="width:${paper[0]}in; height:${paper[1]}in; background:#fff; box-sizing:border-box; border:1px solid #444;">${inner}</div>`;
+  } else {
+    const margin = Number(document.getElementById('sgMargin').value)||0;
+    const gap = Number(document.getElementById('sgGap').value)||0;
+    const cellW = Number(document.getElementById('sgCellW').value)||1;
+    const cellH = Number(document.getElementById('sgCellH').value)||1;
+    const usableW = paper[0]-margin*2, usableH = paper[1]-margin*2;
+    const cols = Math.max(1, Math.floor((usableW+gap)/(cellW+gap)));
+    const rows = Math.max(1, Math.floor((usableH+gap)/(cellH+gap)));
+    fitCountEl.textContent = `Fits ${cols*rows} stickers on this sheet (${cols} × ${rows}).`;
+    let cells = '';
+    for(let i=0;i<rows*cols;i++){ cells += `<div class="rid-cell" style="width:${cellW}in; height:${cellH}in;">${sgPhoto?`<img src="${sgPhoto}">`:''}</div>`; }
+    document.getElementById('sgPage').innerHTML = `
+      <div id="sgPageInner" style="width:${paper[0]}in; height:${paper[1]}in; background:#fff; padding:${margin}in; box-sizing:border-box; border:1px solid #444;">
+        <div style="display:grid; grid-template-columns:repeat(${cols}, ${cellW}in); gap:${gap}in;">${cells}</div>
+      </div>`;
+  }
+}
+function sgExportPng(){
+  const node = document.getElementById('sgPageInner');
+  if(!node){ toast('Nothing to export'); return; }
+  html2canvas(node, {scale:3}).then(canvas=>{
+    const link = document.createElement('a'); link.download='sticker-layout.png'; link.href = canvas.toDataURL('image/png'); link.click();
+  });
+}
+
+/* ===================== BIR CALCULATOR ===================== */
+function computeGraduatedTax(net){
+  net = Math.max(0, net);
+  if(net<=250000) return 0;
+  if(net<=400000) return (net-250000)*0.15;
+  if(net<=800000) return 22500 + (net-400000)*0.20;
+  if(net<=2000000) return 102500 + (net-800000)*0.25;
+  if(net<=8000000) return 402500 + (net-2000000)*0.30;
+  return 2202500 + (net-8000000)*0.35;
+}
+function renderBir(){
+  const gross = Number(document.getElementById('birGross')?.value)||0;
+  const deductions = Number(document.getElementById('birDeductions')?.value)||0;
+  const flat8 = Math.max(0, gross-250000)*0.08;
+  const gradIncomeTax = computeGraduatedTax(gross-deductions);
+  const percentTax = gross*0.03;
+  const gradTotal = gradIncomeTax+percentTax;
+  document.getElementById('bir8Total').textContent = peso(flat8);
+  document.getElementById('birGradIncome').textContent = peso(gradIncomeTax);
+  document.getElementById('birPercentTax').textContent = peso(percentTax);
+  document.getElementById('birGradTotal').textContent = peso(gradTotal);
+  const rec = document.getElementById('birRecommendation');
+  if(gross>3000000){ rec.innerHTML = `<span class="badge orange">Heads up</span> Gross sales above ₱3,000,000 — you're likely required to register as VAT, and the 8% option is not available.`; }
+  else if(gross===0){ rec.innerHTML = ''; }
+  else if(flat8<gradTotal){ rec.innerHTML = `<span class="badge green">Cheaper: 8% Flat Tax</span> Saves ~${peso(gradTotal-flat8)} vs Graduated + Percentage Tax, based on the numbers entered.`; }
+  else { rec.innerHTML = `<span class="badge green">Cheaper: Graduated + Percentage Tax</span> Saves ~${peso(flat8-gradTotal)} vs 8% Flat Tax — usually because deductions are high relative to sales.`; }
+}
+
+/* ===================== SETTINGS / BACKUP ===================== */
+function saveSettingsField(){ state.settings.days_per_month = Number(document.getElementById('settingsDays').value)||26; saveAll(); renderDashboard(); renderFinances(); }
+function exportAllData(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'abasolutely-marketplace-backup-'+todayStr()+'.json'; link.click();
+}
+function importAllData(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      state = Object.assign(state, data);
+      saveAll(); toast('Data imported'); boot();
+    }catch(err){ toast('Invalid file'); }
+  };
+  reader.readAsText(file);
+}
+function resetAllData(){
+  if(!confirm('This will erase all local data. Continue?')) return;
+  ['am_products','am_sales','am_daily_expenses','am_customers','am_expenses','am_restock','am_costings','am_settings'].forEach(k=>localStorage.removeItem(k));
+  location.reload();
+}
+
+/* ===================== MODAL ===================== */
+function openModal(){ document.getElementById('modalOverlay').classList.add('open'); }
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+document.getElementById('modalOverlay').addEventListener('click', e=>{ if(e.target.id==='modalOverlay') closeModal(); });
+
+boot();
+</script>
+</body>
+</html>
