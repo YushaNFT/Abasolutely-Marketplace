@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg: #14140f; --surface: #1c1c15; --surface-2: #24241b; --border: #34342a;
@@ -136,6 +137,7 @@
     </div>
     <nav>
       <div class="nav-divider" style="padding-top:0;">Main Tab</div>
+      <div class="nav-item" data-page="hq"><span class="nav-icon">🏛️</span> HQ</div>
       <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
       <div class="nav-item" data-page="inventory"><span class="nav-icon">📦</span> Inventory</div>
       <div class="nav-item" data-page="sales"><span class="nav-icon">🧾</span> Sales Log</div>
@@ -155,10 +157,45 @@
       <div class="nav-divider">Settings</div>
       <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</div>
     </nav>
-    <div class="sidebar-foot"><span class="conn-dot"></span>Saved locally on this device</div>
+    <div class="sidebar-foot" id="sidebarFoot"><span class="conn-dot" id="connDot" style="background:var(--gold);"></span><span id="connText">Saved locally on this device</span></div>
   </div>
 
   <div id="main">
+
+    <!-- HQ COMMAND CENTER -->
+    <div class="page" id="page-hq">
+      <div class="page-head">
+        <div><h1>🏛️ Command Center</h1><div class="sub">Mission, priorities, roadmap — the strategic view of the whole business</div></div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:16px;">
+        <div class="card" id="hqCard_mission" style="padding:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="font-size:14px;">🎯 Mission Control</h3>
+            <button class="btn small" onclick="openMissionModal()">✏️ Edit</button>
+          </div>
+          <div id="hqMissionBody"></div>
+        </div>
+        <div class="card" id="hqCard_ideaPipeline" style="padding:0;"></div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:16px;">
+        <div class="card" id="hqCard_priorities" style="padding:0;"></div>
+        <div class="card" id="hqCard_marketing" style="padding:0;"></div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:16px;">
+        <div class="card" id="hqCard_storeMap" style="padding:0;"></div>
+        <div class="card" id="hqCard_notesLog" style="padding:0;"></div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:16px;">
+        <div class="card" id="hqCard_roadmap" style="padding:0;"></div>
+        <div class="card" id="hqCard_opportunities" style="padding:0;"></div>
+      </div>
+
+      <div class="card" id="hqCard_problems" style="padding:0;"></div>
+    </div>
 
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
@@ -788,10 +825,18 @@
 
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
-      <div class="page-head"><div><h1>Settings</h1><div class="sub">Local data &amp; preferences</div></div></div>
+      <div class="page-head"><div><h1>Settings</h1><div class="sub">Database sync &amp; preferences</div></div></div>
+      <div class="card" style="max-width:480px; margin-bottom:16px;">
+        <h3 style="font-size:14px; margin-bottom:4px;">☁️ Database Sync</h3>
+        <div class="flag-hint" style="margin-bottom:12px;" id="syncStatusText">Not connected — data is saved to this device only.</div>
+        <div class="field"><label>Supabase Project URL</label><input id="sb_url" placeholder="https://xxxxx.supabase.co"></div>
+        <div class="field"><label>Supabase Anon Public Key</label><input id="sb_key" placeholder="eyJhbGciOi..."></div>
+        <button class="btn" style="width:100%; justify-content:center; margin-bottom:8px;" onclick="connectSupabase()">🔌 Connect</button>
+        <button class="btn secondary" style="width:100%; justify-content:center;" onclick="disconnectSupabase()">Disconnect</button>
+        <div class="flag-hint" style="margin-top:10px;">Once connected, every change here saves to your database automatically — open the same link on your phone or laptop and it'll be the same data.</div>
+      </div>
       <div class="card" style="max-width:480px; margin-bottom:16px;">
         <div class="field"><label>Days per month (for daily target calc)</label><input id="settingsDays" type="number" oninput="saveSettingsField()"></div>
-        <div class="flag-hint">Data currently lives in this browser only (localStorage). Database sync is the next step — nothing here will be lost when we wire it up.</div>
       </div>
       <div class="card" style="max-width:480px;">
         <h3 style="font-size:14px; margin-bottom:12px;">Backup</h3>
@@ -831,6 +876,8 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 function daysAgoStr(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }
 function parseMoney(v){ if(v==null) return 0; const n = parseFloat(String(v).replace(/[₱,\s]/g,'')); return isNaN(n)?0:n; }
+let sb = null;
+let syncTimer = null;
 
 /* ===================== STATE ===================== */
 let state = {
@@ -848,6 +895,7 @@ let state = {
   jobOrders: storageGet('am_job_orders', []),
   quotations: storageGet('am_quotations', []),
   counters: storageGet('am_counters', null),
+  hq: storageGet('am_hq', null),
   settings: storageGet('am_settings', {days_per_month:26}),
   activeCategory: 'Food',
 };
@@ -910,6 +958,87 @@ ensureCheatSheet('Button Pin Maker', { material:'Quaff Double Sided Photopaper',
 ensureCheatSheet('Mini Stickers Plastic (2¼ × 4in)', { paperType:'Plastic', packaging:'12 pcs/pack', notes:'Sell ₱10/12pcs — scalable to ₱15' });
 ensureCheatSheet('Pigment Printer (CUYI)', { inkType:'Pigment Ink', notes:'Printer: CUYI' });
 saveAll();
+if(state.hq === null){
+  state.hq = {
+    mission: {
+      currentMission: "Become Bacao's accessible neighborhood hub for printing, customization, everyday needs & small events",
+      primaryTargets: "Parents • Local Residents • Small Businesses • Students • Teachers",
+      currentStage: "Transition → Stabilization → Service Growth",
+      northStar: "Build daily repeat customers, not dependence on seasonal products",
+      currentFocus: "Reach ₱1,200+ daily sales through services, everyday products & customization",
+      competitiveEdge: "Convenient local printing + personalization + everyday products in one store",
+      storeHours: "5:00 AM – 6:00 PM (Mon–Sun)",
+      keyPeaks: "Morning commuters • School hours • Afternoon residents • Event/printing orders",
+    },
+    ideaPipeline: [
+      {idea:'Mystery Gacha', goal:'Repeat visits', budget:'₱2,500', difficulty:'Medium', priority:'⭐⭐⭐⭐⭐', status:'Planning'},
+      {idea:'Rewards Passport', goal:'Loyalty', budget:'₱500', difficulty:'Easy', priority:'⭐⭐⭐⭐⭐', status:'Planning'},
+      {idea:'Sticker Machine', goal:'Impulse buy', budget:'₱4,000', difficulty:'Medium', priority:'⭐⭐⭐⭐⭐', status:'Designing'},
+      {idea:'Fishing Bowl', goal:'Interactive fun', budget:'₱1,500', difficulty:'Easy', priority:'⭐⭐⭐⭐', status:'Planning'},
+      {idea:'Temporary Tattoos', goal:'Experience', budget:'₱2,000', difficulty:'Medium', priority:'⭐⭐⭐⭐', status:'Planning'},
+      {idea:'DIY Craft Kits', goal:'Rainy day', budget:'₱1,000', difficulty:'Easy', priority:'⭐⭐⭐⭐', status:'Planning'},
+      {idea:'Blind Boxes', goal:'Repeat visits', budget:'₱3,000', difficulty:'Medium', priority:'⭐⭐⭐⭐⭐', status:'Planning'},
+    ],
+    priorities: [
+      {project:'ARRA Printing Expansion', budget:'₱5,000', roi:'⭐⭐⭐⭐⭐', priority:'High', status:'Active', notes:'₱10/₱20/₱30 sections'},
+      {project:'Cameo 5 Product Line', budget:'Existing', roi:'⭐⭐⭐⭐⭐', priority:'High', status:'Active', notes:'Die-cut stickers, labels, decals, toppers & small custom products'},
+      {project:'Bring Back Eggs', budget:'₱1,000', roi:'⭐⭐⭐⭐⭐', priority:'High', status:'Planning', notes:'Find reliable supplier'},
+      {project:'DIY Sticker Machine', budget:'₱3,500', roi:'⭐⭐⭐⭐', priority:'High', status:'Prototype', notes:'Wooden prototype ongoing'},
+      {project:'Refrigerator Upgrade', budget:'₱18,000', roi:'⭐⭐⭐⭐', priority:'High', status:'Planning', notes:'Replace current freezer'},
+      {project:'Frozen Delivery', budget:'₱5,000', roi:'⭐⭐⭐⭐', priority:'Medium', status:'Planning', notes:'Bacao & Antel villages'},
+      {project:'Pigment Printer', budget:'₱12,000', roi:'⭐⭐⭐⭐', priority:'Medium', status:'Future', notes:'Expand ACP capabilities'},
+      {project:'Transition to Party Needs', budget:'₱10,000', roi:'⭐⭐⭐⭐', priority:'Medium', status:'Future', notes:''},
+      {project:'Ice Cream Corner', budget:'₱30,000', roi:'⭐⭐⭐⭐⭐', priority:'High', status:'Planning', notes:'Camel machine + toppings'},
+    ],
+    marketing: [
+      {activity:'Facebook Daily Posts', frequency:'Daily', owner:'GF (remote)', status:'Active', notes:'Food photos, promos, stock updates'},
+      {activity:'Viber Broadcast (FHM)', frequency:'Every 2-3 days', owner:'You', status:'Planning', notes:'Delivery promos + fresh stock alerts'},
+      {activity:"Water Jug Pamphlets", frequency:'Per delivery', owner:"Tita's riders", status:'Active', notes:'Lancaster + Antel coverage'},
+      {activity:'School Tarpaulin', frequency:'Permanent', owner:'You', status:'Planning', notes:'Visible from main road both ways'},
+      {activity:'Barangay FB Groups', frequency:'Weekly', owner:'GF', status:'Planning', notes:'Bacao, Lancaster, Antel groups'},
+      {activity:'Referral Program', frequency:'Ongoing', owner:'Everyone', status:'Future', notes:'₱50 off next order per referral'},
+      {activity:'Teacher Visits', frequency:'Monthly', owner:'You', status:'Future', notes:'Print bundles + loyalty card pitch'},
+    ],
+    storeMap: [
+      {area:'ARRA Printing Counter', mainCustomer:'Adults / Students', objective:'Main service hub', notes:'Near entrance — most visible'},
+      {area:'Pocket Money Corner', mainCustomer:'Kids', objective:'Allowance spending', notes:'₱10/₱20/₱30 shelves'},
+      {area:'Ice Cream Corner', mainCustomer:'Families / Kids', objective:'Impulse + experience', notes:'Camel machine, toppings, floats'},
+      {area:'Frozen & Fresh Section', mainCustomer:'Parents', objective:'Weekly groceries', notes:'Meat, eggs, frozen goods'},
+      {area:'Anik-Anik / DIY Wall', mainCustomer:'Teens / Kids', objective:'Browsing + gifting', notes:"GF's brand booth here"},
+      {area:'Sticker Machine Area', mainCustomer:'Kids', objective:'Entertainment', notes:'Prototype in progress'},
+      {area:'Future Booth Display', mainCustomer:'Everyone', objective:'Marketing + APN', notes:'For events and party needs'},
+    ],
+    notesLog: [],
+    roadmap: [
+      {phase:'Phase 1', objective:'Pocket Money Corner + Budget Zone', status:'Designing', notes:'Shelving + ₱10/20/30 labels needed'},
+      {phase:'Phase 2', objective:'Eggs restocked + reliable supplier', status:'Planning', notes:'Ask around for direct suppliers'},
+      {phase:'Phase 3', objective:'Sticker / Tattoo Vending Machine', status:'Prototype', notes:'Wooden prototype ongoing'},
+      {phase:'Phase 4', objective:'Ice Cream Corner full launch', status:'Planning', notes:'Camel machine + passport stamps'},
+      {phase:'Phase 5', objective:'Frozen & Fresh Delivery live', status:'Planning', notes:'Ebike + Lancaster/Antel routes'},
+      {phase:'Phase 6', objective:'Pigment Printer (ACP expansion)', status:'Future', notes:'After sales hit ₱1,000/day'},
+      {phase:'Phase 7', objective:'Cutting Plotter (sticker prod)', status:'Future', notes:'Pairs with Phase 6'},
+      {phase:'Phase 8', objective:'Booth Rentals + APN Launch', status:'Future', notes:'Arra Party Needs official launch'},
+    ],
+    opportunities: [
+      {idea:'Bottle / Tumbler Printing', potential:'⭐⭐⭐', effort:'Medium', status:'Planning', notes:''},
+      {idea:'Seasonal Gift Packs', potential:'⭐⭐⭐⭐', effort:'Easy', status:'Planning', notes:''},
+      {idea:'Photo Booth Rental', potential:'⭐⭐⭐', effort:'Hard', status:'Planning', notes:''},
+      {idea:'Build-a-Plush', potential:'⭐⭐⭐⭐', effort:'Medium', status:'Planning', notes:''},
+      {idea:'Knitted Animals', potential:'⭐⭐⭐⭐', effort:'Medium', status:'Planning', notes:''},
+      {idea:'Mini Figure Bar', potential:'⭐⭐⭐⭐', effort:'Easy', status:'Planning', notes:''},
+      {idea:'DIY Keychains (GF booth)', potential:'⭐⭐⭐⭐', effort:'Easy', status:'Planning', notes:''},
+    ],
+    problems: [
+      {customer:'Students', problem:'Bored after school', solution:'Pocket Money Corner', impact:'⭐⭐⭐⭐⭐'},
+      {customer:'Students', problem:'No affordable gifts', solution:'Anik-Anik / DIY Wall', impact:'⭐⭐⭐⭐'},
+      {customer:'Parents', problem:'Need daily essentials fast', solution:'Eggs, Frozen, Delivery', impact:'⭐⭐⭐⭐⭐'},
+      {customer:'Parents', problem:'Quick printing needed', solution:'ARRA Creative Prints', impact:'⭐⭐⭐⭐⭐'},
+      {customer:'Families', problem:'Affordable treat / merienda', solution:'Ice Cream Corner', impact:'⭐⭐⭐⭐⭐'},
+      {customer:'Village residents', problem:'Heavy items to carry home', solution:'Delivery service', impact:'⭐⭐⭐⭐'},
+      {customer:'Community', problem:'Party & event supplies', solution:'ARRA Party Needs (APN)', impact:'⭐⭐⭐'},
+    ],
+  };
+}
 if(state.stickerGuides === null){
   state.stickerGuides = [
     { id: uid(), title:'Common Sticker Sizes', details:'2×2in and 3×3in for individual labels; 4×4in for bigger designs; full A4 sheet for custom die-cuts or multi-design sheets.' },
@@ -933,8 +1062,86 @@ function saveAll(){
   storageSet('am_quotations', state.quotations);
   storageSet('am_counters', state.counters);
   storageSet('am_settings', state.settings);
+  storageSet('am_hq', state.hq);
+  scheduleSync();
 }
 let chart = null;
+
+/* ===================== DATABASE SYNC (Supabase) ===================== */
+function setSyncStatus(mode){
+  const dot = document.getElementById('connDot');
+  const text = document.getElementById('connText');
+  const statusText = document.getElementById('syncStatusText');
+  if(mode==='connected'){
+    dot.style.background = 'var(--green)'; text.textContent = 'Synced to database';
+    if(statusText) statusText.textContent = '✅ Connected — changes save to your database automatically.';
+  } else if(mode==='error'){
+    dot.style.background = 'var(--red)'; text.textContent = 'Sync error — saved locally';
+    if(statusText) statusText.textContent = '⚠️ Could not reach the database — check your URL/key below. Your data is still safe on this device.';
+  } else {
+    dot.style.background = 'var(--gold)'; text.textContent = 'Saved locally on this device';
+    if(statusText) statusText.textContent = 'Not connected — data is saved to this device only.';
+  }
+}
+async function initSyncOnLoad(){
+  const url = localStorage.getItem('am_sb_url');
+  const key = localStorage.getItem('am_sb_key');
+  const urlField = document.getElementById('sb_url'), keyField = document.getElementById('sb_key');
+  if(urlField) urlField.value = url||'';
+  if(keyField) keyField.value = key||'';
+  if(!url || !key){ setSyncStatus('local'); return; }
+  try{
+    sb = window.supabase.createClient(url, key);
+    const {data, error} = await sb.from('app_state').select('data').eq('id',1).maybeSingle();
+    if(error) throw error;
+    if(data && data.data && Object.keys(data.data).length){
+      const activeCategory = state.activeCategory;
+      state = Object.assign(state, data.data);
+      state.activeCategory = activeCategory;
+      saveAll();
+    } else {
+      await pushToSupabase();
+    }
+    setSyncStatus('connected');
+  }catch(err){
+    console.error(err);
+    setSyncStatus('error');
+  }
+}
+function scheduleSync(){
+  if(!sb) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushToSupabase, 900);
+}
+async function pushToSupabase(){
+  if(!sb) return;
+  try{
+    const payload = {...state};
+    delete payload.activeCategory;
+    const {error} = await sb.from('app_state').upsert({ id:1, data:payload, updated_at:new Date().toISOString() });
+    if(error) throw error;
+    setSyncStatus('connected');
+  }catch(err){
+    console.error(err);
+    setSyncStatus('error');
+  }
+}
+function connectSupabase(){
+  const url = document.getElementById('sb_url').value.trim();
+  const key = document.getElementById('sb_key').value.trim();
+  if(!url || !key){ toast('Enter both the URL and anon key'); return; }
+  localStorage.setItem('am_sb_url', url);
+  localStorage.setItem('am_sb_key', key);
+  toast('Connecting...');
+  initSyncOnLoad().then(()=>{ toast('Connected — syncing now'); renderEverything(); });
+}
+function disconnectSupabase(){
+  localStorage.removeItem('am_sb_url');
+  localStorage.removeItem('am_sb_key');
+  sb = null;
+  setSyncStatus('local');
+  toast('Disconnected — saving locally only');
+}
 
 /* ===================== NAV ===================== */
 document.querySelectorAll('.nav-item').forEach(item=>{
@@ -956,9 +1163,13 @@ document.querySelectorAll('#invTabs .tab').forEach(t=>{
 document.getElementById('salesDateFilter').addEventListener('change', renderSales);
 
 /* ===================== BOOT ===================== */
-function boot(){
+async function boot(){
   document.getElementById('salesDateFilter').value = todayStr();
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  await initSyncOnLoad();
+  renderEverything();
+}
+function renderEverything(){
   document.getElementById('settingsDays').value = state.settings.days_per_month;
   renderAll();
   initCostingRows();
@@ -977,9 +1188,115 @@ function boot(){
   renderJobOrdersList();
   renderJoStats();
   renderBir();
+  renderMission();
+  Object.keys(hqTableDefs).forEach(renderHqSection);
 }
 function renderAll(){
   renderDashboard(); renderInventory(); renderSales(); renderRestock(); renderCustomers(); renderFinances(); renderCostingsList();
+}
+
+/* ===================== HQ COMMAND CENTER ===================== */
+const missionFields = [
+  {key:'currentMission', label:'Current Mission'},
+  {key:'primaryTargets', label:'Primary Targets'},
+  {key:'currentStage', label:'Current Stage'},
+  {key:'northStar', label:'North Star'},
+  {key:'currentFocus', label:'Current Focus'},
+  {key:'competitiveEdge', label:'Competitive Edge'},
+  {key:'storeHours', label:'Store Hours'},
+  {key:'keyPeaks', label:'Key Peaks'},
+];
+function renderMission(){
+  const m = state.hq.mission;
+  document.getElementById('hqMissionBody').innerHTML = missionFields.map(f=>`
+    <div style="margin-bottom:10px;">
+      <div class="stat-label" style="margin-bottom:2px;">${escapeHtml(f.label)}</div>
+      <div style="font-size:13px; line-height:1.5;">${escapeHtml(m[f.key]||'—')}</div>
+    </div>`).join('');
+}
+function openMissionModal(){
+  const m = state.hq.mission;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Edit Mission Control</h3>
+    ${missionFields.map(f=>`<div class="field"><label>${escapeHtml(f.label)}</label><input id="mf_${f.key}" value="${m[f.key]?escapeHtml(m[f.key]):''}"></div>`).join('')}
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveMission()">Save</button></div>`;
+  openModal();
+}
+function saveMission(){
+  missionFields.forEach(f=>{ state.hq.mission[f.key] = document.getElementById('mf_'+f.key).value.trim(); });
+  saveAll(); closeModal(); toast('Saved'); renderMission();
+}
+
+const hqTableDefs = {
+  ideaPipeline: { title:'💡 Idea Pipeline — Student Attraction', cols:[
+    {key:'idea',label:'Idea'},{key:'goal',label:'Goal'},{key:'budget',label:'Budget'},{key:'difficulty',label:'Difficulty'},{key:'priority',label:'Priority',star:true},{key:'status',label:'Status'}
+  ]},
+  priorities: { title:'🚀 Current Priorities — Projects in Motion', cols:[
+    {key:'project',label:'Project'},{key:'budget',label:'Budget (₱)'},{key:'roi',label:'ROI',star:true},{key:'priority',label:'Priority'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
+  ]},
+  marketing: { title:'📣 Local Marketing Tracker', cols:[
+    {key:'activity',label:'Activity'},{key:'frequency',label:'Frequency'},{key:'owner',label:'Owner'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
+  ]},
+  storeMap: { title:'🏪 Store Experience Map', cols:[
+    {key:'area',label:'Store Area'},{key:'mainCustomer',label:'Main Customer'},{key:'objective',label:'Objective'},{key:'notes',label:'Notes'}
+  ]},
+  notesLog: { title:'📝 Notes & Improvement Log', cols:[
+    {key:'date',label:'Date'},{key:'area',label:'Area'},{key:'note',label:'Note / Observation'},{key:'actionNeeded',label:'Action Needed'}
+  ]},
+  roadmap: { title:'🗺️ Business Roadmap', cols:[
+    {key:'phase',label:'Phase'},{key:'objective',label:'Objective'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
+  ]},
+  opportunities: { title:'🌟 Opportunity Backlog', cols:[
+    {key:'idea',label:'Idea'},{key:'potential',label:'Potential',star:true},{key:'effort',label:'Effort'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
+  ]},
+  problems: { title:'❤️ Customer Problems We Solve', cols:[
+    {key:'customer',label:'Customer'},{key:'problem',label:'Problem'},{key:'solution',label:'Our Solution'},{key:'impact',label:'Impact',star:true}
+  ]},
+};
+function renderHqSection(key){
+  const def = hqTableDefs[key];
+  const rows = state.hq[key];
+  const container = document.getElementById('hqCard_'+key);
+  if(!container) return;
+  const theadCols = def.cols.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('');
+  const tbodyRows = rows.length ? rows.map((r,i)=>`<tr>${def.cols.map(c=>`<td>${escapeHtml(r[c.key]||'—')}</td>`).join('')}<td style="white-space:nowrap;"><button class="icon-btn" onclick="openHqRowModal('${key}',${i})">✏️</button><button class="icon-btn" onclick="deleteHqRow('${key}',${i})">🗑️</button></td></tr>`).join('') : `<tr class="empty-row"><td colspan="${def.cols.length+1}">Nothing here yet.</td></tr>`;
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 18px 0;">
+      <h3 style="font-size:14px;">${def.title}</h3>
+      <button class="btn small" onclick="openHqRowModal('${key}', null)">+ Add</button>
+    </div>
+    <div class="table-wrap" style="margin-top:10px;"><table><thead><tr>${theadCols}<th></th></tr></thead><tbody>${tbodyRows}</tbody></table></div>`;
+}
+function openHqRowModal(key, idx){
+  const def = hqTableDefs[key];
+  const row = (idx!==null && idx!==undefined) ? state.hq[key][idx] : {};
+  const starOpts = ['⭐','⭐⭐','⭐⭐⭐','⭐⭐⭐⭐','⭐⭐⭐⭐⭐'];
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${(idx!==null && idx!==undefined)?'Edit':'Add'} Entry</h3>
+    ${def.cols.map(c=>{
+      if(c.star){ return `<div class="field"><label>${escapeHtml(c.label)}</label><select id="hqf_${c.key}">${starOpts.map(o=>`<option ${row[c.key]===o?'selected':''}>${o}</option>`).join('')}</select></div>`; }
+      return `<div class="field"><label>${escapeHtml(c.label)}</label><input id="hqf_${c.key}" value="${row[c.key]?escapeHtml(row[c.key]):''}"></div>`;
+    }).join('')}
+    <div class="modal-actions">
+      ${(idx!==null && idx!==undefined)?`<button class="btn danger" onclick="deleteHqRow('${key}',${idx},true)">Delete</button>`:''}
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveHqRow('${key}', ${(idx!==null && idx!==undefined)?idx:'null'})">Save</button>
+    </div>`;
+  openModal();
+}
+function saveHqRow(key, idx){
+  const def = hqTableDefs[key];
+  const row = {};
+  def.cols.forEach(c=>{ row[c.key] = document.getElementById('hqf_'+c.key).value.trim(); });
+  if(idx!==null && idx!==undefined){ state.hq[key][idx] = row; } else { state.hq[key].unshift(row); }
+  saveAll(); closeModal(); toast('Saved'); renderHqSection(key);
+}
+function deleteHqRow(key, idx, fromModal){
+  if(!confirm('Delete this entry?')) return;
+  state.hq[key].splice(idx,1);
+  saveAll();
+  if(fromModal) closeModal();
+  renderHqSection(key);
 }
 
 /* ===================== DASHBOARD ===================== */
