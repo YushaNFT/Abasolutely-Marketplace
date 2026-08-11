@@ -1070,7 +1070,7 @@ if(state.stickerGuides === null){
     { id: uid(), title:'Cutting Tips', details:'Kiss-cut for peel-off labels that stay on the backing sheet; full die-cut for standalone shaped stickers. Leave a 2–3mm bleed around each design before cutting.' },
   ];
 }
-function saveAll(){
+function persistLocalOnly(){
   storageSet('am_products', state.products);
   storageSet('am_sales', state.sales);
   storageSet('am_daily_expenses', state.dailyExpenses);
@@ -1087,6 +1087,9 @@ function saveAll(){
   storageSet('am_counters', state.counters);
   storageSet('am_settings', state.settings);
   storageSet('am_hq', state.hq);
+}
+function saveAll(){
+  persistLocalOnly();
   scheduleSync();
 }
 let chart = null;
@@ -1112,11 +1115,13 @@ function scheduleSync(){
   clearTimeout(syncTimer);
   syncTimer = setTimeout(pushToSupabase, 900);
 }
+let lastPushAt = 0;
 async function pushToSupabase(){
   if(!sb) return;
   try{
     const payload = {...state};
     delete payload.activeCategory;
+    lastPushAt = Date.now();
     const {error} = await sb.from('app_state').upsert({ id:1, data:payload, updated_at:new Date().toISOString() });
     if(error) throw error;
     setSyncStatus('connected');
@@ -1133,7 +1138,7 @@ async function pullFromSupabase(){
       const activeCategory = state.activeCategory;
       state = Object.assign(state, data.data);
       state.activeCategory = activeCategory;
-      saveAll();
+      persistLocalOnly();
     } else {
       await pushToSupabase();
     }
@@ -1142,6 +1147,27 @@ async function pullFromSupabase(){
     console.error(err);
     setSyncStatus('error', err.message || String(err));
   }
+}
+let lastSyncToastAt = 0;
+function throttledSyncToast(){
+  const now = Date.now();
+  if(now - lastSyncToastAt > 4000){ toast('🔄 Updated by your team'); lastSyncToastAt = now; }
+}
+function subscribeToRealtimeUpdates(){
+  if(!sb) return;
+  sb.channel('app_state_live')
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'app_state', filter:'id=eq.1' }, payload=>{
+      if(Date.now() - lastPushAt < 1500) return; // this is just our own save echoing back — ignore it
+      if(payload.new && payload.new.data && Object.keys(payload.new.data).length){
+        const activeCategory = state.activeCategory;
+        state = Object.assign(state, payload.new.data);
+        state.activeCategory = activeCategory;
+        persistLocalOnly();
+        renderEverything();
+        throttledSyncToast();
+      }
+    })
+    .subscribe();
 }
 
 /* ===================== AUTH ===================== */
@@ -1174,6 +1200,7 @@ async function doLogin(){
   document.getElementById('app').style.display = 'flex';
   await pullFromSupabase();
   renderEverything();
+  subscribeToRealtimeUpdates();
 }
 async function doLogout(){
   await sb.auth.signOut();
@@ -1208,6 +1235,7 @@ async function boot(){
   document.getElementById('app').style.display = 'flex';
   await pullFromSupabase();
   renderEverything();
+  subscribeToRealtimeUpdates();
 }
 function renderEverything(){
   document.getElementById('settingsDays').value = state.settings.days_per_month;
