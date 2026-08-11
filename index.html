@@ -885,8 +885,8 @@
 
 <script>
 /* ===================== DATABASE CONNECTION (fill in once, shared by your whole team) ===================== */
-const SUPABASE_URL = '';       // <-- paste your Supabase Project URL here, e.g. https://xxxxx.supabase.co
-const SUPABASE_ANON_KEY = '';  // <-- paste your Supabase anon public key here
+const SUPABASE_URL = 'https://kkrbypdvfckdhhcooszb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrcmJ5cGR2ZmNrZGhoY29vc3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NjA1NTMsImV4cCI6MjEwMDQzNjU1M30.YHqYBA64ZLre7C1JaGOGSSF3w2agXZNFmAvXh0Na9lk';
 
 /* ===================== STORAGE ===================== */
 function storageGet(key, def){ try{ const v = localStorage.getItem(key); return v!==null ? JSON.parse(v) : def; }catch(e){ return def; } }
