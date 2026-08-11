@@ -129,7 +129,27 @@
 </head>
 <body>
 
-<div id="app">
+<div id="authScreen" style="display:none; min-height:100vh; align-items:center; justify-content:center; padding:20px;">
+  <div class="setup-card" style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:34px; max-width:400px; width:100%;">
+    <div style="text-align:center; margin-bottom:20px;">
+      <div style="width:48px; height:48px; border-radius:10px; background:linear-gradient(135deg,var(--amber),var(--gold)); display:flex; align-items:center; justify-content:center; font-size:22px; margin:0 auto 12px;">🧡</div>
+      <h1 style="font-size:20px;">Abasolutely Marketplace</h1>
+      <div style="color:var(--text-muted); font-size:13px; margin-top:4px;">Sign in to access the Ops Hub</div>
+    </div>
+    <div id="authNotConfigured" style="display:none; text-align:center; color:var(--text-muted); font-size:13px; line-height:1.6;">
+      Database isn't connected yet — ask your admin to finish setup.
+    </div>
+    <div id="authLoginForm">
+      <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="you@example.com"></div>
+      <div class="field"><label>Password</label><input id="authPassword" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin();"></div>
+      <div id="authError" style="color:var(--red); font-size:12px; margin-bottom:10px; min-height:16px;"></div>
+      <button class="btn" style="width:100%; justify-content:center;" onclick="doLogin()">Sign In</button>
+      <div style="text-align:center; font-size:12px; color:var(--text-muted); margin-top:14px;">No account? Ask the shop owner to add you.</div>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
   <div id="sidebar">
     <div class="brand">
       <div class="brand-mark">🧡</div>
@@ -829,11 +849,9 @@
       <div class="card" style="max-width:480px; margin-bottom:16px;">
         <h3 style="font-size:14px; margin-bottom:4px;">☁️ Database Sync</h3>
         <div class="flag-hint" style="margin-bottom:12px;" id="syncStatusText">Not connected — data is saved to this device only.</div>
-        <div class="field"><label>Supabase Project URL</label><input id="sb_url" placeholder="https://xxxxx.supabase.co"></div>
-        <div class="field"><label>Supabase Anon Public Key</label><input id="sb_key" placeholder="eyJhbGciOi..."></div>
-        <button class="btn" style="width:100%; justify-content:center; margin-bottom:8px;" onclick="connectSupabase()">🔌 Connect</button>
-        <button class="btn secondary" style="width:100%; justify-content:center;" onclick="disconnectSupabase()">Disconnect</button>
-        <div class="flag-hint" style="margin-top:10px;">Once connected, every change here saves to your database automatically — open the same link on your phone or laptop and it'll be the same data.</div>
+        <div class="field"><label>Signed in as</label><input id="accountEmail" disabled value="—"></div>
+        <button class="btn secondary" style="width:100%; justify-content:center;" onclick="doLogout()">🔓 Log Out</button>
+        <div class="flag-hint" style="margin-top:10px;">Everyone on your team signs in with their own account — no setup needed on their end. To add or remove someone's access, go to your Supabase dashboard → Authentication → Users.</div>
       </div>
       <div class="card" style="max-width:480px; margin-bottom:16px;">
         <div class="field"><label>Days per month (for daily target calc)</label><input id="settingsDays" type="number" oninput="saveSettingsField()"></div>
@@ -866,6 +884,10 @@
 <div id="toast"></div>
 
 <script>
+/* ===================== DATABASE CONNECTION (fill in once, shared by your whole team) ===================== */
+const SUPABASE_URL = '';       // <-- paste your Supabase Project URL here, e.g. https://xxxxx.supabase.co
+const SUPABASE_ANON_KEY = '';  // <-- paste your Supabase anon public key here
+
 /* ===================== STORAGE ===================== */
 function storageGet(key, def){ try{ const v = localStorage.getItem(key); return v!==null ? JSON.parse(v) : def; }catch(e){ return def; } }
 function storageSet(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
@@ -878,6 +900,8 @@ function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg
 function parseMoney(v){ if(v==null) return 0; const n = parseFloat(String(v).replace(/[₱,\s]/g,'')); return isNaN(n)?0:n; }
 let sb = null;
 let syncTimer = null;
+let currentUser = null;
+
 
 /* ===================== STATE ===================== */
 let state = {
@@ -1068,7 +1092,7 @@ function saveAll(){
 let chart = null;
 
 /* ===================== DATABASE SYNC (Supabase) ===================== */
-function setSyncStatus(mode){
+function setSyncStatus(mode, detail){
   const dot = document.getElementById('connDot');
   const text = document.getElementById('connText');
   const statusText = document.getElementById('syncStatusText');
@@ -1077,35 +1101,10 @@ function setSyncStatus(mode){
     if(statusText) statusText.textContent = '✅ Connected — changes save to your database automatically.';
   } else if(mode==='error'){
     dot.style.background = 'var(--red)'; text.textContent = 'Sync error — saved locally';
-    if(statusText) statusText.textContent = '⚠️ Could not reach the database — check your URL/key below. Your data is still safe on this device.';
+    if(statusText) statusText.textContent = '⚠️ ' + (detail || 'Could not reach the database.') + ' Your data is still safe on this device.';
   } else {
     dot.style.background = 'var(--gold)'; text.textContent = 'Saved locally on this device';
     if(statusText) statusText.textContent = 'Not connected — data is saved to this device only.';
-  }
-}
-async function initSyncOnLoad(){
-  const url = localStorage.getItem('am_sb_url');
-  const key = localStorage.getItem('am_sb_key');
-  const urlField = document.getElementById('sb_url'), keyField = document.getElementById('sb_key');
-  if(urlField) urlField.value = url||'';
-  if(keyField) keyField.value = key||'';
-  if(!url || !key){ setSyncStatus('local'); return; }
-  try{
-    sb = window.supabase.createClient(url, key);
-    const {data, error} = await sb.from('app_state').select('data').eq('id',1).maybeSingle();
-    if(error) throw error;
-    if(data && data.data && Object.keys(data.data).length){
-      const activeCategory = state.activeCategory;
-      state = Object.assign(state, data.data);
-      state.activeCategory = activeCategory;
-      saveAll();
-    } else {
-      await pushToSupabase();
-    }
-    setSyncStatus('connected');
-  }catch(err){
-    console.error(err);
-    setSyncStatus('error');
   }
 }
 function scheduleSync(){
@@ -1123,24 +1122,62 @@ async function pushToSupabase(){
     setSyncStatus('connected');
   }catch(err){
     console.error(err);
-    setSyncStatus('error');
+    setSyncStatus('error', err.message || String(err));
   }
 }
-function connectSupabase(){
-  const url = document.getElementById('sb_url').value.trim();
-  const key = document.getElementById('sb_key').value.trim();
-  if(!url || !key){ toast('Enter both the URL and anon key'); return; }
-  localStorage.setItem('am_sb_url', url);
-  localStorage.setItem('am_sb_key', key);
-  toast('Connecting...');
-  initSyncOnLoad().then(()=>{ toast('Connected — syncing now'); renderEverything(); });
+async function pullFromSupabase(){
+  try{
+    const {data, error} = await sb.from('app_state').select('data').eq('id',1).maybeSingle();
+    if(error) throw error;
+    if(data && data.data && Object.keys(data.data).length){
+      const activeCategory = state.activeCategory;
+      state = Object.assign(state, data.data);
+      state.activeCategory = activeCategory;
+      saveAll();
+    } else {
+      await pushToSupabase();
+    }
+    setSyncStatus('connected');
+  }catch(err){
+    console.error(err);
+    setSyncStatus('error', err.message || String(err));
+  }
 }
-function disconnectSupabase(){
-  localStorage.removeItem('am_sb_url');
-  localStorage.removeItem('am_sb_key');
-  sb = null;
-  setSyncStatus('local');
-  toast('Disconnected — saving locally only');
+
+/* ===================== AUTH ===================== */
+async function initAuth(){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY){
+    document.getElementById('authNotConfigured').style.display = '';
+    document.getElementById('authLoginForm').style.display = 'none';
+    document.getElementById('authScreen').style.display = 'flex';
+    return false;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){
+    currentUser = session.user;
+    return true;
+  }
+  document.getElementById('authScreen').style.display = 'flex';
+  return false;
+}
+async function doLogin(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  if(!email || !password){ errEl.textContent = 'Enter both email and password.'; return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ errEl.textContent = error.message; return; }
+  currentUser = data.user;
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  await pullFromSupabase();
+  renderEverything();
+}
+async function doLogout(){
+  await sb.auth.signOut();
+  location.reload();
 }
 
 /* ===================== NAV ===================== */
@@ -1166,11 +1203,16 @@ document.getElementById('salesDateFilter').addEventListener('change', renderSale
 async function boot(){
   document.getElementById('salesDateFilter').value = todayStr();
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
-  await initSyncOnLoad();
+  const authed = await initAuth();
+  if(!authed){ return; } // login screen is showing; boot resumes via doLogin()
+  document.getElementById('app').style.display = 'flex';
+  await pullFromSupabase();
   renderEverything();
 }
 function renderEverything(){
   document.getElementById('settingsDays').value = state.settings.days_per_month;
+  const emailEl = document.getElementById('accountEmail');
+  if(emailEl) emailEl.textContent = currentUser ? currentUser.email : '—';
   renderAll();
   initCostingRows();
   buildProductSelect();
