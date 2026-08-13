@@ -159,28 +159,48 @@
       <div class="nav-divider" style="padding-top:0;">Main Tab</div>
       <div class="nav-item" data-page="hq"><span class="nav-icon">🏛️</span> HQ</div>
       <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="reports"><span class="nav-icon">📈</span> Reports</div>
       <div class="nav-item" data-page="inventory"><span class="nav-icon">📦</span> Inventory</div>
       <div class="nav-item" data-page="sales"><span class="nav-icon">🧾</span> Sales Log</div>
       <div class="nav-item" data-page="restock"><span class="nav-icon">🛒</span> Restock Budget</div>
       <div class="nav-item" data-page="customers"><span class="nav-icon">🤝</span> Customer/CRM</div>
       <div class="nav-item" data-page="finances"><span class="nav-icon">💰</span> Finances</div>
-      <div class="nav-item" data-page="bir"><span class="nav-icon">🏛️</span> BIR Calculator</div>
-      <div class="nav-divider">Printing Tools</div>
       <div class="nav-item" data-page="joborders"><span class="nav-icon">📋</span> Job Orders</div>
       <div class="nav-item" data-page="quotations"><span class="nav-icon">🧾</span> Quotation</div>
+      <div class="nav-divider">Printing Tools</div>
       <div class="nav-item" data-page="costing"><span class="nav-icon">🧮</span> Printing Costing</div>
       <div class="nav-item" data-page="rushid"><span class="nav-icon">🪪</span> Rush ID Template</div>
       <div class="nav-item" data-page="stickerguides"><span class="nav-icon">🏷️</span> Sticker Guides</div>
       <div class="nav-item" data-page="manageproducts"><span class="nav-icon">🗂️</span> Manage Products</div>
       <div class="nav-item" data-page="printrestock"><span class="nav-icon">🏪</span> Restock</div>
       <div class="nav-item" data-page="cheatsheet"><span class="nav-icon">📋</span> Cheat Sheet</div>
+      <div class="nav-divider">Party Needs</div>
+      <div class="nav-item" data-page="pnEvents"><span class="nav-icon">🎉</span> Event Quotation</div>
+      <div class="nav-item" data-page="pnBookings"><span class="nav-icon">📅</span> Bookings</div>
+      <div class="nav-item" data-page="pnJobOrders"><span class="nav-icon">📋</span> Job Order</div>
+      <div class="nav-item" data-page="pnInventory"><span class="nav-icon">🪑</span> Inventory</div>
       <div class="nav-divider">Settings</div>
+      <div class="nav-item" data-page="bir"><span class="nav-icon">🏛️</span> BIR Calculator</div>
       <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</div>
     </nav>
     <div class="sidebar-foot" id="sidebarFoot"><span class="conn-dot" id="connDot" style="background:var(--gold);"></span><span id="connText">Saved locally on this device</span></div>
   </div>
 
   <div id="main">
+
+    <!-- REPORTS -->
+    <div class="page" id="page-reports">
+      <div class="page-head">
+        <div><h1>📈 Reports</h1><div class="sub" id="reportDateLabel">Generated fresh every time you open this page</div></div>
+        <button class="btn secondary" onclick="copyReportSummary(reportActiveTab)">📋 Copy Summary</button>
+      </div>
+      <div class="tabbar" id="reportTabs">
+        <div class="tab active" data-range="daily">Daily</div>
+        <div class="tab" data-range="weekly">Weekly</div>
+        <div class="tab" data-range="monthly">Monthly</div>
+      </div>
+      <div id="reportBody"></div>
+    </div>
 
     <!-- HQ COMMAND CENTER -->
     <div class="page" id="page-hq">
@@ -498,6 +518,149 @@
       </div>
     </div>
 
+    <!-- PARTY NEEDS: EVENT QUOTATION -->
+    <div class="page" id="page-pnEvents">
+      <div id="pnEventListView">
+        <div class="page-head">
+          <div><h1>🎉 Event Quotation</h1><div class="sub">Full event quote — rentals, delivery, gatepasses, tolls — with an auto-generated Event ID</div></div>
+          <button class="btn" onclick="openEventBuilder()">+ New Event</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Event ID</th><th>Client</th><th>Event Date</th><th>Grand Total</th><th>Status</th><th></th></tr></thead>
+            <tbody id="pnEventsBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div id="pnEventBuilderView" style="display:none;">
+        <div class="page-head">
+          <div><h1 id="pnEventTitle">New Event</h1><div class="sub">Event Template — same flow as your master sheet</div></div>
+          <button class="btn secondary" onclick="backToEventList()">← Back to List</button>
+        </div>
+        <div class="two-col">
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="field-row">
+                <div class="field"><label>Event ID</label><input id="pn_eventid" disabled></div>
+                <div class="field"><label>Event Date</label><input type="date" id="pn_eventdate"></div>
+              </div>
+              <div class="field"><label>Client / Company Name</label><input id="pn_client" placeholder="e.g. Julia Reyes"></div>
+              <div class="field-row">
+                <div class="field"><label>Contact Number</label><input id="pn_contact" placeholder="09XX..."></div>
+                <div class="field"><label>Event Address</label><input id="pn_address" placeholder="Venue / location"></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>Ingress (Date/Time)</label><input id="pn_ingress" placeholder="e.g. Aug 12, 2026 - 9AM"></div>
+                <div class="field"><label>Egress (Date/Time)</label><input id="pn_egress" placeholder="e.g. Aug 13, 2026 - 11AM"></div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom:16px;">
+              <div class="cost-section-head"><h3 style="font-size:14px;">📦 Event Requirements (Rentals)</h3><button class="icon-btn" onclick="addPnReqRow()">➕</button></div>
+              <div class="cost-col-labels" style="grid-template-columns:1.2fr 0.8fr 0.5fr 0.6fr auto;"><span>Item</span><span>Specs</span><span>Qty</span><span>Price</span><span></span></div>
+              <div id="pnReqRows"></div>
+              <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); margin-top:8px; padding-top:10px; font-weight:600;">
+                <span>Total Rental</span><span id="pnReqTotal">₱0</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="cost-section-head"><h3 style="font-size:14px;">🧾 Event Related Expenses <span style="font-weight:400; color:var(--text-muted); font-size:11px;">(deliveries, gatepasses, tolls, etc.)</span></h3><button class="icon-btn" onclick="addPnExpRow()">➕</button></div>
+              <div class="cost-col-labels" style="grid-template-columns:1fr 1fr 0.7fr 0.6fr auto;"><span>Category</span><span>Details</span><span>Source</span><span>Price</span><span></span></div>
+              <div id="pnExpRows"></div>
+              <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); margin-top:8px; padding-top:10px; font-weight:600;">
+                <span>Total Expenses</span><span id="pnExpTotal">₱0</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:13px; margin-bottom:10px;">Fees &amp; Totals</h3>
+              <div class="field-row">
+                <div class="field"><label>Delivery Fee (₱)</label><input id="pn_deliveryfee" type="number" value="0" oninput="renderPnTotals()"></div>
+                <div class="field"><label>Setup Fee (₱)</label><input id="pn_setupfee" type="number" value="0" oninput="renderPnTotals()"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid var(--border);"><span>Total Rental</span><span id="pnSumRental">₱0</span></div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>+ Delivery Fee</span><span id="pnSumDelivery">₱0</span></div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>+ Setup Fee</span><span id="pnSumSetup">₱0</span></div>
+              <div style="display:flex; justify-content:space-between; align-items:center; background:var(--amber-dim); border-radius:8px; padding:12px 14px; margin-top:8px;">
+                <span style="font-weight:700;">GRAND TOTAL</span><span class="stat-value amber" id="pnGrandTotal" style="font-size:22px;">₱0</span>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:16px; background:var(--green-dim); border-color:var(--green);">
+              <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>Total Income</span><span id="pnTotalIncome">₱0</span></div>
+              <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>Total Expenses</span><span id="pnTotalExpensesOut">₱0</span></div>
+              <div style="display:flex; justify-content:space-between; padding:4px 0; font-weight:700;"><span>Net Income</span><span class="green" id="pnNetIncome">₱0</span></div>
+            </div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:13px; margin-bottom:10px;">Payment</h3>
+              <div class="field-row">
+                <div class="field"><label>Payment Status</label><select id="pn_paystatus"><option>Unpaid</option><option>Partial</option><option>Paid</option></select></div>
+                <div class="field"><label>Amount Paid (₱)</label><input id="pn_amountpaid" type="number" value="0"></div>
+              </div>
+              <div class="field"><label>Payment Method</label><select id="pn_method"><option>GCash</option><option>Maya</option><option>BPI</option><option>Cash</option></select></div>
+            </div>
+            <button class="btn secondary" style="width:100%; justify-content:center; margin-bottom:8px;" onclick="savePnEvent('Draft')">💾 Save Draft</button>
+            <button class="btn" style="width:100%; justify-content:center;" onclick="finalizePnEvent()">🖼 Finalize &amp; View Quotation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PARTY NEEDS: BOOKINGS -->
+    <div class="page" id="page-pnBookings">
+      <div class="page-head">
+        <div><h1>📅 Bookings</h1><div class="sub">Every event, organized by month</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px; display:flex; gap:12px; align-items:center;">
+        <button class="icon-btn" onclick="shiftBookingMonth(-1)">◀</button>
+        <div class="mono" id="bookingMonthLabel" style="font-weight:600; min-width:140px; text-align:center;"></div>
+        <button class="icon-btn" onclick="shiftBookingMonth(1)">▶</button>
+      </div>
+      <div class="grid grid-stats">
+        <div class="card"><div class="stat-label">Bookings This Month</div><div class="stat-value" id="bkStatCount">0</div></div>
+        <div class="card"><div class="stat-label">Total Income</div><div class="stat-value amber" id="bkStatIncome">₱0</div></div>
+        <div class="card"><div class="stat-label">Total Expenses</div><div class="stat-value red" id="bkStatExpenses">₱0</div></div>
+        <div class="card"><div class="stat-label">Net Income</div><div class="stat-value green" id="bkStatNet">₱0</div></div>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Event ID</th><th>Client</th><th>Date</th><th>Income</th><th>Expenses</th><th>Net</th><th>Status</th></tr></thead>
+          <tbody id="bookingsBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- PARTY NEEDS: JOB ORDER -->
+    <div class="page" id="page-pnJobOrders">
+      <div class="page-head">
+        <div><h1>📋 Party Job Orders</h1><div class="sub">Prep &amp; delivery tracking for booked events</div></div>
+        <button class="btn" onclick="openPnJobModal()">+ New Job Order</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Event ID</th><th>Client</th><th>Event Date</th><th>Prep Status</th><th>Payment</th><th></th></tr></thead>
+          <tbody id="pnJobsBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- PARTY NEEDS: INVENTORY -->
+    <div class="page" id="page-pnInventory">
+      <div class="page-head">
+        <div><h1>🪑 Party Needs Inventory</h1><div class="sub">Chairs, tables, covers &amp; everything you rent out</div></div>
+        <button class="btn" onclick="openPnInventoryModal()">+ Add Item</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Item</th><th>Category</th><th>Specs</th><th>Stock Owned</th><th>Rental Rate</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="pnInventoryBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
     <!-- MANAGE PRODUCTS (the printing services database) -->
     <div class="page" id="page-manageproducts">
       <div class="page-head">
@@ -549,11 +712,12 @@
           <h3 style="font-size:14px; margin:18px 0 10px;">Itemized Breakdown</h3>
           <div id="qbItemsList"></div>
           <div class="cost-row" style="grid-template-columns:1.6fr 0.6fr 0.8fr auto; margin-top:8px;">
-            <input id="qb_new_desc" list="printProductSuggestions" placeholder="Description">
+            <select id="qb_new_desc_select" onchange="onCategorySelectChange('qb_new_desc_select','qb_new_desc')"></select>
             <input id="qb_new_qty" type="number" value="1" placeholder="Qty">
             <input id="qb_new_price" type="number" step="any" placeholder="₱ / Unit">
             <button class="icon-btn" onclick="addQuoteItem()">➕</button>
           </div>
+          <input id="qb_new_desc" placeholder="Type custom item name" style="display:none; margin-top:6px;">
 
           <div style="display:flex; justify-content:space-between; align-items:center; background:var(--amber-dim); border-radius:8px; padding:14px 16px; margin-top:18px;">
             <span style="font-weight:700;">GRAND TOTAL</span>
@@ -631,11 +795,12 @@
               <h3 style="font-size:13px; margin-bottom:10px;">Job Items</h3>
               <div id="joItemsList"></div>
               <div class="cost-row" style="grid-template-columns:1.6fr 0.7fr 0.5fr auto; margin-top:8px;">
-                <input id="jo_new_desc" list="printProductSuggestions" placeholder="Item / Product">
+                <select id="jo_new_desc_select" onchange="onCategorySelectChange('jo_new_desc_select','jo_new_desc')"></select>
                 <input id="jo_new_price" type="number" step="any" placeholder="Price">
                 <input id="jo_new_qty" type="number" value="1" placeholder="Qty">
                 <button class="icon-btn" onclick="addJoItem()">➕</button>
               </div>
+              <input id="jo_new_desc" placeholder="Type custom item name" style="display:none; margin-top:6px;">
             </div>
           </div>
           <div>
@@ -879,7 +1044,7 @@
     <button class="btn secondary" style="flex:1; justify-content:center;" onclick="copyQuoteImage()">📋 Copy Image</button>
     <button class="btn" style="flex:1; justify-content:center;" onclick="saveQuoteImage()">⬇ Save Image</button>
   </div>
-  <button class="btn" style="width:100%; max-width:400px; justify-content:center; background:var(--green); color:#0c1a0c;" onclick="convertQuoteToJobOrder()">🛍 Convert to Job Order</button>
+  <button class="btn" style="width:100%; max-width:400px; justify-content:center; background:var(--green); color:#0c1a0c;" onclick="handleQuoteCardConvert()">🛍 Convert to Job Order</button>
 </div>
 <div id="toast"></div>
 
@@ -920,6 +1085,8 @@ let state = {
   quotations: storageGet('am_quotations', []),
   counters: storageGet('am_counters', null),
   hq: storageGet('am_hq', null),
+  partyBookings: storageGet('am_party_bookings', []),
+  partyInventory: storageGet('am_party_inventory', null),
   settings: storageGet('am_settings', {days_per_month:26}),
   activeCategory: 'Food',
 };
@@ -1070,6 +1237,14 @@ if(state.stickerGuides === null){
     { id: uid(), title:'Cutting Tips', details:'Kiss-cut for peel-off labels that stay on the backing sheet; full die-cut for standalone shaped stickers. Leave a 2–3mm bleed around each design before cutting.' },
   ];
 }
+if(state.partyInventory === null){
+  state.partyInventory = [
+    { id: uid(), name:'Uratex Chair', category:'Chairs', specs:'White', stock:20, rate:30, notes:'' },
+    { id: uid(), name:'6FT Table Cover', category:'Table Covers', specs:'White', stock:5, rate:50, notes:'' },
+    { id: uid(), name:'4FT Lifetime Table', category:'Tables', specs:'', stock:5, rate:150, notes:'' },
+    { id: uid(), name:'4FT Table Cover', category:'Table Covers', specs:'White', stock:5, rate:50, notes:'' },
+  ];
+}
 function persistLocalOnly(){
   storageSet('am_products', state.products);
   storageSet('am_sales', state.sales);
@@ -1087,6 +1262,8 @@ function persistLocalOnly(){
   storageSet('am_counters', state.counters);
   storageSet('am_settings', state.settings);
   storageSet('am_hq', state.hq);
+  storageSet('am_party_bookings', state.partyBookings);
+  storageSet('am_party_inventory', state.partyInventory);
 }
 function saveAll(){
   persistLocalOnly();
@@ -1260,6 +1437,11 @@ function renderEverything(){
   renderBir();
   renderMission();
   Object.keys(hqTableDefs).forEach(renderHqSection);
+  renderPnEventsList();
+  renderBookingsPage();
+  renderPnJobsList();
+  renderPnInventory();
+  renderReportBody(reportActiveTab);
 }
 function renderAll(){
   renderDashboard(); renderInventory(); renderSales(); renderRestock(); renderCustomers(); renderFinances(); renderCostingsList();
@@ -1367,6 +1549,99 @@ function deleteHqRow(key, idx, fromModal){
   saveAll();
   if(fromModal) closeModal();
   renderHqSection(key);
+}
+
+/* ===================== REPORTS ===================== */
+let reportActiveTab = 'daily';
+document.getElementById('reportTabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('#reportTabs .tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  reportActiveTab = t.dataset.range;
+  renderReportBody(reportActiveTab);
+});
+function computeReport(range){
+  const today = todayStr();
+  let dateFilter, label;
+  if(range==='daily'){ dateFilter = d=>d===today; label = 'Today — '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); }
+  else if(range==='weekly'){ const start=daysAgoStr(6); dateFilter = d=>d>=start; label = 'Last 7 Days'; }
+  else { const prefix = today.slice(0,7); dateFilter = d=>d.startsWith(prefix); label = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}); }
+
+  const sales = state.sales.filter(s=>dateFilter(s.sale_date));
+  const totalSales = sales.reduce((a,s)=>a+Number(s.total||0),0);
+  const totalItems = sales.reduce((a,s)=>a+Number(s.qty||0),0);
+  const opex = state.dailyExpenses.filter(e=>dateFilter(e.date)).reduce((a,e)=>a+Number(e.amount||0),0);
+
+  const tally={}, catTally={};
+  sales.forEach(s=>{ const n=s.product_name_snapshot||'—'; tally[n]=(tally[n]||0)+Number(s.qty||0); const c=s.category||'—'; catTally[c]=(catTally[c]||0)+Number(s.qty||0); });
+  const topProducts = Object.entries(tally).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const topCategory = Object.entries(catTally).sort((a,b)=>b[1]-a[1])[0];
+
+  const jobsInRange = state.jobOrders.filter(j=>dateFilter((j.createdAt||'').slice(0,10)));
+  const jobsDone = jobsInRange.filter(j=>j.productionStatus==='Done').length;
+  const jobsPending = jobsInRange.filter(j=>j.productionStatus!=='Done').length;
+  const jobsRevenue = jobsInRange.reduce((a,j)=>a+j.items.reduce((s,it)=>s+it.qty*it.price,0),0);
+
+  const quotesInRange = state.quotations.filter(q=>dateFilter((q.createdAt||'').slice(0,10)));
+  const quotesFinalized = quotesInRange.filter(q=>q.status==='Finalized').length;
+  const quotesValue = quotesInRange.reduce((a,q)=>a+q.items.reduce((s,it)=>s+it.qty*it.price,0),0);
+
+  const eventsInRange = state.partyBookings.filter(b=>dateFilter((b.createdAt||'').slice(0,10)));
+  const eventsFinalized = eventsInRange.filter(b=>b.quoteStatus==='Finalized').length;
+  const eventsValue = eventsInRange.reduce((a,b)=>a+pnGrandTotal(b),0);
+
+  const needsRestock = state.products.filter(p=>Number(p.stock||0)<=Number(p.par_level||0)).length;
+
+  const monthlyBudget = state.expenses.reduce((a,e)=>a+Number(e.budget||0),0);
+  const daily = monthlyBudget/(state.settings.days_per_month||26);
+  let target=0;
+  if(range==='daily') target=daily;
+  else if(range==='weekly') target=daily*7;
+  else target=monthlyBudget;
+
+  return { label, totalSales, totalItems, opex, net: totalSales-opex, topProducts, topCategory, jobsDone, jobsPending, jobsRevenue, quotesFinalized, quotesValue, eventsFinalized, eventsValue, needsRestock, target };
+}
+function renderReportBody(range){
+  const r = computeReport(range);
+  document.getElementById('reportDateLabel').textContent = r.label;
+  const statusBadge = r.totalSales>=r.target ? `<span class="badge green">🟢 Above target by ${peso(r.totalSales-r.target)}</span>` : `<span class="badge red">🔴 Below target by ${peso(r.target-r.totalSales)}</span>`;
+  document.getElementById('reportBody').innerHTML = `
+    <div class="grid grid-stats">
+      <div class="card"><div class="stat-label">Total Sales</div><div class="stat-value amber">${peso(r.totalSales)}</div></div>
+      <div class="card"><div class="stat-label">Items Sold</div><div class="stat-value">${r.totalItems}</div></div>
+      <div class="card"><div class="stat-label">Expenses (OPEX)</div><div class="stat-value red">${peso(r.opex)}</div></div>
+      <div class="card"><div class="stat-label">Net</div><div class="stat-value green">${peso(r.net)}</div></div>
+      <div class="card"><div class="stat-label">Vs Daily Target</div>${statusBadge}</div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <h3 style="font-size:14px; margin-bottom:12px;">🏆 Top Products</h3>
+        ${r.topProducts.length ? `<table><tbody>${r.topProducts.map(([n,q])=>`<tr><td>${escapeHtml(n)}</td><td style="text-align:right;">${q} sold</td></tr>`).join('')}</tbody></table>` : '<div class="flag-hint">No sales in this period yet.</div>'}
+        <div class="stat-label" style="margin-top:12px;">Top Moving Category</div>
+        <div style="font-size:14px;">${r.topCategory?escapeHtml(r.topCategory[0]):'—'}</div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px; margin-bottom:12px;">🧾 Orders, Quotes &amp; Events</h3>
+        <div class="stat-label">Printing Job Orders</div>
+        <div style="margin-bottom:10px;">${r.jobsDone} done, ${r.jobsPending} pending — ${peso(r.jobsRevenue)} in value</div>
+        <div class="stat-label">Printing Quotations</div>
+        <div style="margin-bottom:10px;">${r.quotesFinalized} finalized — ${peso(r.quotesValue)} quoted</div>
+        <div class="stat-label">Party Needs Events</div>
+        <div style="margin-bottom:10px;">${r.eventsFinalized} finalized — ${peso(r.eventsValue)} quoted</div>
+        <div class="stat-label">Inventory</div>
+        <div>${r.needsRestock} product(s) need restocking</div>
+      </div>
+    </div>`;
+}
+function reportSummaryText(r, rangeLabel){
+  return `📊 ${rangeLabel} Report — Abasolutely Marketplace\n${r.label}\n\n💰 Total Sales: ${peso(r.totalSales)}\n📦 Items Sold: ${r.totalItems}\n💸 Expenses: ${peso(r.opex)}\n✅ Net: ${peso(r.net)}\n🎯 Target: ${peso(r.target)} (${r.totalSales>=r.target?'Above ✅':'Below ⚠️'})\n\n🏆 Top Product: ${r.topProducts[0]?r.topProducts[0][0]:'—'}\n🏷️ Top Category: ${r.topCategory?r.topCategory[0]:'—'}\n\n🧾 Job Orders: ${r.jobsDone} done, ${r.jobsPending} pending (${peso(r.jobsRevenue)})\n📋 Quotations: ${r.quotesFinalized} finalized (${peso(r.quotesValue)})\n🎉 Events: ${r.eventsFinalized} finalized (${peso(r.eventsValue)})\n🔴 Needs Restock: ${r.needsRestock} items`;
+}
+function copyReportSummary(range){
+  const r = computeReport(range);
+  const label = range==='daily'?'Daily':range==='weekly'?'Weekly':'Monthly';
+  const text = reportSummaryText(r, label);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>toast('Copied — paste into Viber/FB')).catch(()=>toast('Could not copy — select manually'));
+  } else { toast('Copy not supported here'); }
 }
 
 /* ===================== DASHBOARD ===================== */
@@ -1855,9 +2130,34 @@ function applyCustomJob(){
 /* ===================== QUOTATIONS ===================== */
 let quoteDraft = null;
 let currentQuote = null;
+let currentPnBooking = null;
+let quoteCardMode = 'printing';
 function genQuoteNo(){ return 'QT-'+Math.floor(100000+Math.random()*900000); }
 function populatePrintProductSuggestions(){
   document.getElementById('printProductSuggestions').innerHTML = state.printProducts.map(p=>`<option value="${escapeHtml(p.name)}">`).join('');
+  populateCategorizedSelect('qb_new_desc_select');
+  populateCategorizedSelect('jo_new_desc_select');
+}
+function populateCategorizedSelect(selectId){
+  const el = document.getElementById(selectId);
+  if(!el) return;
+  const cats = {};
+  state.printProducts.forEach(p=>{ (cats[p.category]=cats[p.category]||[]).push(p); });
+  el.innerHTML = '<option value="__custom__">✏️ Custom Item (type below)</option>' +
+    Object.entries(cats).map(([cat,items])=>
+      `<optgroup label="${escapeHtml(cat)}">${items.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('')}</optgroup>`
+    ).join('');
+}
+function onCategorySelectChange(selectId, textId){
+  const isCustom = document.getElementById(selectId).value === '__custom__';
+  const textEl = document.getElementById(textId);
+  textEl.style.display = isCustom ? '' : 'none';
+  if(isCustom) textEl.focus();
+}
+function getSelectedItemDescription(selectId, textId){
+  const sel = document.getElementById(selectId);
+  if(sel.value === '__custom__'){ return document.getElementById(textId).value.trim(); }
+  return sel.value;
 }
 function renderQuotationsList(){
   const body = document.getElementById('quotationsBody');
@@ -1889,6 +2189,7 @@ function openQuoteBuilder(id){
   document.getElementById('qb_company').value = quoteDraft.company;
   document.getElementById('qb_preparedby').value = quoteDraft.preparedBy;
   populatePrintProductSuggestions();
+  document.getElementById('qb_new_desc').style.display='none';
   renderQbItems();
   document.getElementById('quoteListView').style.display='none';
   document.getElementById('quoteBuilderView').style.display='';
@@ -1908,12 +2209,14 @@ function renderQbItems(){
   document.getElementById('qbGrandTotal').textContent = peso(total);
 }
 function addQuoteItem(){
-  const desc = document.getElementById('qb_new_desc').value.trim();
+  const desc = getSelectedItemDescription('qb_new_desc_select','qb_new_desc');
   const qty = Number(document.getElementById('qb_new_qty').value)||1;
   const price = Number(document.getElementById('qb_new_price').value)||0;
   if(!desc){ toast('Enter a description'); return; }
   quoteDraft.items.push({description:desc, qty, price});
-  document.getElementById('qb_new_desc').value=''; document.getElementById('qb_new_qty').value='1'; document.getElementById('qb_new_price').value='';
+  document.getElementById('qb_new_desc').value=''; document.getElementById('qb_new_desc').style.display='none';
+  document.getElementById('qb_new_desc_select').value='__custom__';
+  document.getElementById('qb_new_qty').value='1'; document.getElementById('qb_new_price').value='';
   renderQbItems();
 }
 function removeQuoteItem(i){ quoteDraft.items.splice(i,1); renderQbItems(); }
@@ -1953,6 +2256,7 @@ function deleteQuotation(id){
 }
 function showQuoteCard(q){
   currentQuote = q;
+  quoteCardMode = 'printing';
   const total = q.items.reduce((a,it)=>a+it.qty*it.price,0);
   document.getElementById('quoteCardInner').innerHTML = `
     <div style="background:#12130f; color:#fff; padding:24px; text-align:center;">
@@ -1979,11 +2283,15 @@ function showQuoteCard(q){
     </div>`;
   document.getElementById('quoteCardOverlay').style.display='flex';
 }
-function closeQuoteCard(){ document.getElementById('quoteCardOverlay').style.display='none'; backToQuoteList(); }
+function closeQuoteCard(){
+  document.getElementById('quoteCardOverlay').style.display='none';
+  if(quoteCardMode==='party'){ backToEventList(); } else { backToQuoteList(); }
+}
 function saveQuoteImage(){
   const node = document.getElementById('quoteCardInner');
   html2canvas(node, {scale:3}).then(canvas=>{
-    const link = document.createElement('a'); link.download = (currentQuote?currentQuote.quoteNo:'quotation')+'.png'; link.href = canvas.toDataURL('image/png'); link.click();
+    const name = quoteCardMode==='party' ? (currentPnBooking?currentPnBooking.eventId:'event-quote') : (currentQuote?currentQuote.quoteNo:'quotation');
+    const link = document.createElement('a'); link.download = name+'.png'; link.href = canvas.toDataURL('image/png'); link.click();
   });
 }
 function copyQuoteImage(){
@@ -2001,6 +2309,9 @@ function copyQuoteImage(){
     });
   });
 }
+function handleQuoteCardConvert(){
+  if(quoteCardMode==='party'){ convertPnToJobOrder(); } else { convertQuoteToJobOrder(); }
+}
 function convertQuoteToJobOrder(){
   if(!currentQuote){ toast('Nothing to convert'); return; }
   const q = currentQuote;
@@ -2012,6 +2323,292 @@ function convertQuoteToJobOrder(){
   openJobOrderBuilder(null, q);
   toast('Quotation converted — review the details below, then click Create Job Order to save it');
 }
+
+/* ===================== PARTY NEEDS ===================== */
+function genEventId(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const yy = String(d.getFullYear()).slice(-2);
+  const prefix = mm+dd+yy;
+  const countToday = state.partyBookings.filter(b=>b.eventId && b.eventId.startsWith(prefix)).length + 1;
+  return prefix+'-'+countToday;
+}
+function pnTotalRental(b){ return b.rentalItems.reduce((a,r)=>a+(Number(r.qty)||0)*(Number(r.price)||0),0); }
+function pnTotalExpenses(b){ return b.expenseItems.reduce((a,e)=>a+(Number(e.price)||0),0); }
+function pnGrandTotal(b){ return pnTotalRental(b) + Number(b.deliveryFee||0) + Number(b.setupFee||0); }
+
+let pnDraft = null;
+function renderPnEventsList(){
+  const body = document.getElementById('pnEventsBody');
+  if(!state.partyBookings.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No events yet.</td></tr>`; return; }
+  body.innerHTML = state.partyBookings.map(b=>`<tr>
+    <td class="mono">${escapeHtml(b.eventId)}</td>
+    <td>${escapeHtml(b.clientName)}</td>
+    <td>${b.eventDate||'—'}</td>
+    <td>${peso(pnGrandTotal(b))}</td>
+    <td><span class="badge ${b.quoteStatus==='Finalized'?'green':'gray'}">${escapeHtml(b.quoteStatus)}</span></td>
+    <td>
+      <button class="icon-btn" onclick="openEventBuilder('${b.id}')">✏️</button>
+      ${b.quoteStatus==='Finalized'?`<button class="icon-btn" onclick="showPnQuoteCard(state.partyBookings.find(x=>x.id==='${b.id}'))">🖼️</button>`:''}
+      <button class="icon-btn" onclick="deletePnEvent('${b.id}')">🗑️</button>
+    </td>
+  </tr>`).join('');
+}
+function openEventBuilder(id){
+  const existing = id ? state.partyBookings.find(b=>b.id===id) : null;
+  pnDraft = existing ? JSON.parse(JSON.stringify(existing)) : {
+    id:null, eventId: genEventId(), clientName:'', eventAddress:'', contactNumber:'', eventDate:'', ingress:'', egress:'',
+    rentalItems:[], expenseItems:[], deliveryFee:0, setupFee:0,
+    quoteStatus:'Draft', jobStatus:'Not Started', paymentStatus:'Unpaid', amountPaid:0, method:'GCash', createdAt:new Date().toISOString()
+  };
+  document.getElementById('pnEventTitle').textContent = existing ? 'Edit '+existing.eventId : 'New Event';
+  document.getElementById('pn_eventid').value = pnDraft.eventId;
+  document.getElementById('pn_eventdate').value = pnDraft.eventDate;
+  document.getElementById('pn_client').value = pnDraft.clientName;
+  document.getElementById('pn_contact').value = pnDraft.contactNumber;
+  document.getElementById('pn_address').value = pnDraft.eventAddress;
+  document.getElementById('pn_ingress').value = pnDraft.ingress;
+  document.getElementById('pn_egress').value = pnDraft.egress;
+  document.getElementById('pn_deliveryfee').value = pnDraft.deliveryFee;
+  document.getElementById('pn_setupfee').value = pnDraft.setupFee;
+  document.getElementById('pn_paystatus').value = pnDraft.paymentStatus;
+  document.getElementById('pn_amountpaid').value = pnDraft.amountPaid;
+  document.getElementById('pn_method').value = pnDraft.method;
+  renderPnReqRows(); renderPnExpRows(); renderPnTotals();
+  document.getElementById('pnEventListView').style.display='none';
+  document.getElementById('pnEventBuilderView').style.display='';
+}
+function backToEventList(){
+  document.getElementById('pnEventBuilderView').style.display='none';
+  document.getElementById('pnEventListView').style.display='';
+  renderPnEventsList();
+}
+function renderPnReqRows(){
+  document.getElementById('pnReqRows').innerHTML = pnDraft.rentalItems.length ? pnDraft.rentalItems.map((r,i)=>`
+    <div class="cost-row" style="grid-template-columns:1.2fr 0.8fr 0.5fr 0.6fr auto;">
+      <input value="${escapeHtml(r.item)}" placeholder="Item" oninput="updatePnReq(${i},'item',this.value)">
+      <input value="${escapeHtml(r.specs||'')}" placeholder="Specs" oninput="updatePnReq(${i},'specs',this.value)">
+      <input type="number" step="any" value="${r.qty}" oninput="updatePnReq(${i},'qty',this.value)">
+      <input type="number" step="any" value="${r.price}" oninput="updatePnReq(${i},'price',this.value)">
+      <button class="icon-btn" onclick="removePnReq(${i})">🗑️</button>
+    </div>`).join('') : `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:12px;">No items yet.</div>`;
+  renderPnTotals();
+}
+function addPnReqRow(){ pnDraft.rentalItems.push({item:'',specs:'',qty:1,price:0}); renderPnReqRows(); }
+function updatePnReq(i,field,val){ pnDraft.rentalItems[i][field] = (field==='item'||field==='specs')?val:(Number(val)||0); renderPnTotals(); }
+function removePnReq(i){ pnDraft.rentalItems.splice(i,1); renderPnReqRows(); }
+function renderPnExpRows(){
+  document.getElementById('pnExpRows').innerHTML = pnDraft.expenseItems.length ? pnDraft.expenseItems.map((e,i)=>`
+    <div class="cost-row" style="grid-template-columns:1fr 1fr 0.7fr 0.6fr auto;">
+      <input value="${escapeHtml(e.category)}" placeholder="e.g. Gatepass" oninput="updatePnExp(${i},'category',this.value)">
+      <input value="${escapeHtml(e.details||'')}" placeholder="Details" oninput="updatePnExp(${i},'details',this.value)">
+      <input value="${escapeHtml(e.source||'')}" placeholder="Cash/Gcash" oninput="updatePnExp(${i},'source',this.value)">
+      <input type="number" step="any" value="${e.price}" oninput="updatePnExp(${i},'price',this.value)">
+      <button class="icon-btn" onclick="removePnExp(${i})">🗑️</button>
+    </div>`).join('') : `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:12px;">No expenses yet.</div>`;
+  renderPnTotals();
+}
+function addPnExpRow(){ pnDraft.expenseItems.push({category:'',details:'',source:'',price:0}); renderPnExpRows(); }
+function updatePnExp(i,field,val){ pnDraft.expenseItems[i][field] = field==='price'?(Number(val)||0):val; renderPnTotals(); }
+function removePnExp(i){ pnDraft.expenseItems.splice(i,1); renderPnExpRows(); }
+function renderPnTotals(){
+  const rental = pnDraft.rentalItems.reduce((a,r)=>a+(Number(r.qty)||0)*(Number(r.price)||0),0);
+  const expenses = pnDraft.expenseItems.reduce((a,e)=>a+(Number(e.price)||0),0);
+  const deliveryFee = Number(document.getElementById('pn_deliveryfee').value)||0;
+  const setupFee = Number(document.getElementById('pn_setupfee').value)||0;
+  const grand = rental+deliveryFee+setupFee;
+  const net = grand-expenses;
+  document.getElementById('pnReqTotal').textContent = peso(rental);
+  document.getElementById('pnExpTotal').textContent = peso(expenses);
+  document.getElementById('pnSumRental').textContent = peso(rental);
+  document.getElementById('pnSumDelivery').textContent = peso(deliveryFee);
+  document.getElementById('pnSumSetup').textContent = peso(setupFee);
+  document.getElementById('pnGrandTotal').textContent = peso(grand);
+  document.getElementById('pnTotalIncome').textContent = peso(grand);
+  document.getElementById('pnTotalExpensesOut').textContent = peso(expenses);
+  document.getElementById('pnNetIncome').textContent = peso(net);
+}
+function pullPnFieldsFromForm(){
+  pnDraft.eventDate = document.getElementById('pn_eventdate').value;
+  pnDraft.clientName = document.getElementById('pn_client').value.trim();
+  pnDraft.contactNumber = document.getElementById('pn_contact').value.trim();
+  pnDraft.eventAddress = document.getElementById('pn_address').value.trim();
+  pnDraft.ingress = document.getElementById('pn_ingress').value.trim();
+  pnDraft.egress = document.getElementById('pn_egress').value.trim();
+  pnDraft.deliveryFee = Number(document.getElementById('pn_deliveryfee').value)||0;
+  pnDraft.setupFee = Number(document.getElementById('pn_setupfee').value)||0;
+  pnDraft.paymentStatus = document.getElementById('pn_paystatus').value;
+  pnDraft.amountPaid = Number(document.getElementById('pn_amountpaid').value)||0;
+  pnDraft.method = document.getElementById('pn_method').value;
+}
+function persistPnDraft(quoteStatus){
+  pnDraft.quoteStatus = quoteStatus;
+  if(pnDraft.id){ const b = state.partyBookings.find(x=>x.id===pnDraft.id); Object.assign(b, pnDraft); }
+  else { pnDraft.id = uid(); state.partyBookings.unshift({...pnDraft}); }
+  saveAll();
+}
+function savePnEvent(status){
+  pullPnFieldsFromForm();
+  if(!pnDraft.clientName){ toast('Client name required'); return; }
+  persistPnDraft(status);
+  toast('Saved'); backToEventList();
+}
+function finalizePnEvent(){
+  pullPnFieldsFromForm();
+  if(!pnDraft.clientName){ toast('Client name required'); return; }
+  if(!pnDraft.rentalItems.length && !pnDraft.expenseItems.length){ toast('Add at least one item'); return; }
+  persistPnDraft('Finalized');
+  showPnQuoteCard(pnDraft);
+}
+function deletePnEvent(id){ if(!confirm('Delete this event?')) return; state.partyBookings = state.partyBookings.filter(b=>b.id!==id); saveAll(); renderPnEventsList(); }
+function showPnQuoteCard(b){
+  currentPnBooking = b;
+  quoteCardMode = 'party';
+  const rental = pnTotalRental(b), grand = pnGrandTotal(b);
+  document.getElementById('quoteCardInner').innerHTML = `
+    <div style="background:#12130f; color:#fff; padding:24px; text-align:center;">
+      <div style="font-family:'Fraunces',serif; font-weight:700; font-size:18px;">ARRA PARTY NEEDS</div>
+      <div style="font-size:11px; letter-spacing:.12em; color:#d4af5a; margin-top:4px;">EVENT QUOTATION</div>
+    </div>
+    <div style="padding:20px 24px;">
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-bottom:14px;">
+        <div>EVENT ID<div style="color:#111; font-weight:700; font-size:13px;">${escapeHtml(b.eventId)}</div></div>
+        <div style="text-align:right;">EVENT DATE<div style="color:#111; font-weight:700; font-size:13px;">${escapeHtml(b.eventDate||'—')}</div></div>
+      </div>
+      <div style="font-size:11px; color:#888;">CLIENT</div>
+      <div style="font-weight:700; font-size:15px; color:#111; margin-bottom:6px;">${escapeHtml(b.clientName)}</div>
+      <div style="font-size:11px; color:#888;">VENUE</div>
+      <div style="font-size:13px; color:#111; margin-bottom:6px;">${escapeHtml(b.eventAddress||'—')}</div>
+      <div style="font-size:11px; color:#888;">INGRESS / EGRESS</div>
+      <div style="font-size:13px; color:#111; margin-bottom:14px;">${escapeHtml(b.ingress||'—')} → ${escapeHtml(b.egress||'—')}</div>
+      <div style="font-size:10px; color:#888; text-transform:uppercase; border-bottom:1px solid #ddd; padding-bottom:6px; margin-bottom:6px;">Event Requirements</div>
+      ${b.rentalItems.length ? b.rentalItems.map(r=>`<div style="display:flex; justify-content:space-between; font-size:13px; color:#111; padding:4px 0;"><span>${r.qty} × ${escapeHtml(r.item)}${r.specs?' ('+escapeHtml(r.specs)+')':''}</span><span>${peso(r.qty*r.price)}</span></div>`).join('') : '<div style="font-size:12px; color:#999;">None</div>'}
+      <div style="display:flex; justify-content:space-between; font-size:13px; color:#111; padding:4px 0; border-top:1px dashed #ddd; margin-top:6px; padding-top:6px;"><span>Delivery Fee</span><span>${peso(b.deliveryFee)}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; color:#111; padding:4px 0;"><span>Setup Fee</span><span>${peso(b.setupFee)}</span></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#f3f3f3; border-radius:8px; padding:12px 14px; margin-top:12px;">
+        <span style="font-weight:700; font-size:13px; color:#111;">GRAND TOTAL</span>
+        <span style="font-weight:800; font-size:20px; color:#e8963c;">${peso(grand)}</span>
+      </div>
+    </div>`;
+  document.getElementById('quoteCardOverlay').style.display='flex';
+}
+function convertPnToJobOrder(){
+  if(!currentPnBooking){ toast('Nothing to convert'); return; }
+  document.getElementById('quoteCardOverlay').style.display='none';
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelector('.nav-item[data-page="pnJobOrders"]').classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-pnJobOrders').classList.add('active');
+  if(currentPnBooking.jobStatus==='Not Started'){ currentPnBooking.jobStatus='Preparing'; saveAll(); }
+  renderPnJobsList();
+  toast('Converted — event added to Job Order tracking');
+}
+
+/* Bookings — monthly log */
+let bookingMonthOffset = 0;
+function shiftBookingMonth(delta){ bookingMonthOffset += delta; renderBookingsPage(); }
+function renderBookingsPage(){
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+bookingMonthOffset);
+  const label = d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  document.getElementById('bookingMonthLabel').textContent = label;
+  const monthPrefix = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  const items = state.partyBookings.filter(b=>b.eventDate && b.eventDate.startsWith(monthPrefix));
+  const totalIncome = items.reduce((a,b)=>a+pnGrandTotal(b),0);
+  const totalExpenses = items.reduce((a,b)=>a+pnTotalExpenses(b),0);
+  document.getElementById('bkStatCount').textContent = items.length;
+  document.getElementById('bkStatIncome').textContent = peso(totalIncome);
+  document.getElementById('bkStatExpenses').textContent = peso(totalExpenses);
+  document.getElementById('bkStatNet').textContent = peso(totalIncome-totalExpenses);
+  const body = document.getElementById('bookingsBody');
+  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="7">No bookings this month.</td></tr>`; return; }
+  body.innerHTML = items.map(b=>`<tr>
+    <td class="mono">${escapeHtml(b.eventId)}</td><td>${escapeHtml(b.clientName)}</td><td>${b.eventDate||'—'}</td>
+    <td>${peso(pnGrandTotal(b))}</td><td>${peso(pnTotalExpenses(b))}</td><td>${peso(pnGrandTotal(b)-pnTotalExpenses(b))}</td>
+    <td><span class="badge ${b.jobStatus==='Returned'?'green':'orange'}">${escapeHtml(b.jobStatus)}</span></td>
+  </tr>`).join('');
+}
+
+/* Job Order — prep/delivery workflow over finalized events */
+function renderPnJobsList(){
+  const body = document.getElementById('pnJobsBody');
+  const items = state.partyBookings.filter(b=>b.quoteStatus==='Finalized');
+  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No finalized events yet.</td></tr>`; return; }
+  body.innerHTML = items.map(b=>`<tr>
+    <td class="mono">${escapeHtml(b.eventId)}</td><td>${escapeHtml(b.clientName)}</td><td>${b.eventDate||'—'}</td>
+    <td><span class="badge ${b.jobStatus==='Returned'?'green':b.jobStatus==='At Event'?'orange':'gray'}">${escapeHtml(b.jobStatus)}</span></td>
+    <td><span class="badge ${b.paymentStatus==='Paid'?'green':'red'}">${escapeHtml(b.paymentStatus)}</span></td>
+    <td><button class="icon-btn" onclick="openPnJobModal('${b.id}')">✏️</button></td>
+  </tr>`).join('');
+}
+function openPnJobModal(id){
+  if(!id){
+    const finalized = state.partyBookings.filter(b=>b.quoteStatus==='Finalized');
+    if(!finalized.length){ toast('Finalize an event quotation first'); return; }
+    document.getElementById('modalBody').innerHTML = `
+      <h3>Select Event</h3>
+      <div class="field"><label>Event</label><select id="pnj_pick">${finalized.map(b=>`<option value="${b.id}">${escapeHtml(b.eventId)} — ${escapeHtml(b.clientName)}</option>`).join('')}</select></div>
+      <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="openPnJobModal(document.getElementById('pnj_pick').value)">Next</button></div>`;
+    openModal();
+    return;
+  }
+  const b = state.partyBookings.find(x=>x.id===id);
+  if(!b) return;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${escapeHtml(b.eventId)} — ${escapeHtml(b.clientName)}</h3>
+    <div class="field"><label>Job Status</label><select id="pnj_status">${['Not Started','Preparing','Out for Delivery','At Event','Returned'].map(s=>`<option ${b.jobStatus===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field-row">
+      <div class="field"><label>Payment Status</label><select id="pnj_pay">${['Unpaid','Partial','Paid'].map(s=>`<option ${b.paymentStatus===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Amount Paid (₱)</label><input id="pnj_amountpaid" type="number" value="${b.amountPaid||0}"></div>
+    </div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="savePnJobStatus('${b.id}')">Save</button></div>`;
+  openModal();
+}
+function savePnJobStatus(id){
+  const b = state.partyBookings.find(x=>x.id===id);
+  b.jobStatus = document.getElementById('pnj_status').value;
+  b.paymentStatus = document.getElementById('pnj_pay').value;
+  b.amountPaid = Number(document.getElementById('pnj_amountpaid').value)||0;
+  saveAll(); closeModal(); toast('Updated'); renderPnJobsList();
+}
+
+/* Party Needs Inventory */
+function renderPnInventory(){
+  const body = document.getElementById('pnInventoryBody');
+  if(!state.partyInventory.length){ body.innerHTML = `<tr class="empty-row"><td colspan="7">No items yet.</td></tr>`; return; }
+  body.innerHTML = state.partyInventory.map(p=>`<tr>
+    <td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category||'—')}</td><td>${escapeHtml(p.specs||'—')}</td>
+    <td>${p.stock??0}</td><td>${peso(p.rate)}</td><td>${escapeHtml(p.notes||'—')}</td>
+    <td><button class="icon-btn" onclick="openPnInventoryModal('${p.id}')">✏️</button><button class="icon-btn" onclick="deletePnInventory('${p.id}')">🗑️</button></td>
+  </tr>`).join('');
+}
+function openPnInventoryModal(id){
+  const p = id ? state.partyInventory.find(x=>x.id===id) : null;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${p?'Edit':'Add'} Item</h3>
+    <div class="field"><label>Item Name</label><input id="pi_name" value="${p?escapeHtml(p.name):''}" placeholder="e.g. Uratex Chair"></div>
+    <div class="field-row">
+      <div class="field"><label>Category</label><input id="pi_category" value="${p?escapeHtml(p.category||''):''}" placeholder="Chairs / Tables / Covers"></div>
+      <div class="field"><label>Specs</label><input id="pi_specs" value="${p?escapeHtml(p.specs||''):''}" placeholder="e.g. White"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Stock Owned</label><input id="pi_stock" type="number" value="${p?p.stock??0:0}"></div>
+      <div class="field"><label>Rental Rate (₱)</label><input id="pi_rate" type="number" step="any" value="${p?p.rate??0:0}"></div>
+    </div>
+    <div class="field"><label>Notes</label><input id="pi_notes" value="${p?escapeHtml(p.notes||''):''}"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="savePnInventory(${p?`'${p.id}'`:'null'})">Save</button></div>`;
+  openModal();
+}
+function savePnInventory(id){
+  const name = document.getElementById('pi_name').value.trim();
+  if(!name){ toast('Item name required'); return; }
+  const payload = { name, category: document.getElementById('pi_category').value.trim(), specs: document.getElementById('pi_specs').value.trim(),
+    stock: Number(document.getElementById('pi_stock').value)||0, rate: Number(document.getElementById('pi_rate').value)||0, notes: document.getElementById('pi_notes').value.trim() };
+  if(id){ const p = state.partyInventory.find(x=>x.id===id); Object.assign(p, payload); }
+  else { state.partyInventory.push({ id: uid(), ...payload }); }
+  saveAll(); closeModal(); toast('Saved'); renderPnInventory();
+}
+function deletePnInventory(id){ if(!confirm('Delete this item?')) return; state.partyInventory = state.partyInventory.filter(p=>p.id!==id); saveAll(); renderPnInventory(); }
 
 /* ===================== JOB ORDERS ===================== */
 let jobOrderDraft = null;
@@ -2088,6 +2685,7 @@ function openJobOrderBuilder(id, fromQuote){
   document.querySelectorAll('#joDeliveryTabs .tab').forEach(t=>t.classList.toggle('active', t.dataset.val===jobOrderDraft.deliveryMethod));
   document.getElementById('joSaveBtn').textContent = existing ? 'Update Job Order' : 'Create Job Order';
   populatePrintProductSuggestions();
+  document.getElementById('jo_new_desc').style.display='none';
   renderJoItems();
   document.getElementById('joListView').style.display='none';
   document.getElementById('joBuilderView').style.display='';
@@ -2107,12 +2705,14 @@ function renderJoItems(){
   document.getElementById('joTotalValuation').textContent = peso(total);
 }
 function addJoItem(){
-  const desc = document.getElementById('jo_new_desc').value.trim();
+  const desc = getSelectedItemDescription('jo_new_desc_select','jo_new_desc');
   const price = Number(document.getElementById('jo_new_price').value)||0;
   const qty = Number(document.getElementById('jo_new_qty').value)||1;
   if(!desc){ toast('Enter item / product'); return; }
   jobOrderDraft.items.push({description:desc, price, qty});
-  document.getElementById('jo_new_desc').value=''; document.getElementById('jo_new_price').value=''; document.getElementById('jo_new_qty').value='1';
+  document.getElementById('jo_new_desc').value=''; document.getElementById('jo_new_desc').style.display='none';
+  document.getElementById('jo_new_desc_select').value='__custom__';
+  document.getElementById('jo_new_price').value=''; document.getElementById('jo_new_qty').value='1';
   renderJoItems();
 }
 function removeJoItem(i){ jobOrderDraft.items.splice(i,1); renderJoItems(); }
