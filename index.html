@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <style>
   :root{
     --bg: #14140f; --surface: #1c1c15; --surface-2: #24241b; --border: #34342a;
@@ -120,6 +121,23 @@
   .rid-cell img{ width:100%; height:100%; object-fit:cover; display:block; }
   .rid-group-row{ display:grid; grid-template-columns:0.6fr 0.65fr 0.65fr 0.6fr auto; gap:6px; margin-bottom:8px; align-items:center; }
 
+  /* TASK BOARD */
+  .task-board{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:start; }
+  @media(max-width:900px){ .task-board{ grid-template-columns:1fr; } }
+  .task-col{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px; min-height:80px; }
+  .task-col-head{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin-bottom:10px; padding:0 2px; }
+  .task-col-body{ min-height:60px; display:flex; flex-direction:column; gap:8px; }
+  .task-col-body.sortable-ghost{ opacity:.3; }
+  .task-card{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; cursor:grab; transition:.12s; }
+  .task-card:active{ cursor:grabbing; }
+  .task-card:hover{ border-color:var(--amber-dim); }
+  .task-card-title{ font-size:13px; font-weight:600; margin-bottom:6px; }
+  .task-card-due{ font-size:11px; color:var(--text-muted); margin-bottom:6px; }
+  .task-card-due.overdue{ color:var(--red); font-weight:600; }
+  .task-card-foot{ display:flex; justify-content:space-between; align-items:center; }
+  .task-avatar{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#1c1305; flex-shrink:0; }
+  .nav-badge{ background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-left:auto; }
+
   @media print{
     body *{ visibility:hidden; }
     #ridPageInner, #ridPageInner *, #sgPageInner, #sgPageInner *{ visibility:visible; }
@@ -158,6 +176,7 @@
     <nav>
       <div class="nav-divider" style="padding-top:0;">Main Tab</div>
       <div class="nav-item" data-page="hq"><span class="nav-icon">🏛️</span> HQ</div>
+      <div class="nav-item" data-page="tasks"><span class="nav-icon">✅</span> Tasks <span class="nav-badge" id="taskNavBadge" style="display:none;"></span></div>
       <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
       <div class="nav-item" data-page="reports"><span class="nav-icon">📈</span> Reports</div>
       <div class="nav-item" data-page="inventory"><span class="nav-icon">📦</span> Inventory</div>
@@ -187,6 +206,38 @@
   </div>
 
   <div id="main">
+
+    <!-- TASKS -->
+    <div class="page" id="page-tasks">
+      <div class="page-head">
+        <div><h1>✅ Tasks</h1><div class="sub">Drag cards between columns — assign teammates to get notified</div></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn secondary" onclick="enableTaskNotifications()">🔔 Enable Notifications</button>
+          <button class="btn secondary" onclick="openTeamModal()">👥 Team</button>
+          <button class="btn" onclick="openTaskModal()">+ Add Task</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <input id="taskSearch" placeholder="Search tasks..." style="max-width:240px;" oninput="renderTasks()">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); text-transform:none; cursor:pointer; margin:0;">
+          <input type="checkbox" id="taskMyOnly" style="width:auto;" onchange="renderTasks()"> Only my tasks
+        </label>
+      </div>
+      <div class="task-board">
+        <div class="task-col">
+          <div class="task-col-head">📋 To Do <span class="badge gray" id="taskCount_todo">0</span></div>
+          <div class="task-col-body" id="taskList_todo" data-status="todo"></div>
+        </div>
+        <div class="task-col">
+          <div class="task-col-head">🚧 In Progress <span class="badge orange" id="taskCount_inprogress">0</span></div>
+          <div class="task-col-body" id="taskList_inprogress" data-status="inprogress"></div>
+        </div>
+        <div class="task-col">
+          <div class="task-col-head">✅ Done <span class="badge green" id="taskCount_done">0</span></div>
+          <div class="task-col-body" id="taskList_done" data-status="done"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- REPORTS -->
     <div class="page" id="page-reports">
@@ -650,26 +701,37 @@
     <!-- PARTY NEEDS: INVENTORY -->
     <div class="page" id="page-pnInventory">
       <div class="page-head">
-        <div><h1>🪑 Party Needs Inventory</h1><div class="sub">Chairs, tables, covers &amp; everything you rent out</div></div>
+        <div><h1>🪑 Party Needs Inventory</h1><div class="sub">Chairs, tables, covers &amp; everything you rent out — feeds the Event Quotation item picker</div></div>
         <button class="btn" onclick="openPnInventoryModal()">+ Add Item</button>
       </div>
-      <div class="card" style="padding:0;">
+      <div class="card" style="padding:0; margin-bottom:16px;">
         <div class="table-wrap"><table>
           <thead><tr><th>Item</th><th>Category</th><th>Specs</th><th>Stock Owned</th><th>Rental Rate</th><th>Notes</th><th></th></tr></thead>
           <tbody id="pnInventoryBody"></tbody>
         </table></div>
+      </div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div>
+            <h3 style="font-size:14px;">🎨 Specs / Colors</h3>
+            <div class="flag-hint" style="margin-top:2px;">Options shown in the Specs dropdown on Event Quotation — add your own anytime</div>
+          </div>
+          <button class="btn small" onclick="addPartyColor()">+ Add</button>
+        </div>
+        <div id="partyColorsList" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
       </div>
     </div>
 
     <!-- MANAGE PRODUCTS (the printing services database) -->
     <div class="page" id="page-manageproducts">
       <div class="page-head">
-        <div><h1>Manage Products</h1><div class="sub">Your printing services database — this feeds the Quick Job Setup picker on Printing Costing</div></div>
+        <div><h1>Manage Products</h1><div class="sub">Your printing services database — categories here are exactly what shows up grouped on the Quotation &amp; Job Order item pickers</div></div>
         <button class="btn" onclick="openProductTemplateModal()">+ Add Product</button>
       </div>
+      <div class="tabbar" id="mpCategoryTabs"></div>
       <div class="card" style="padding:0;">
         <div class="table-wrap"><table>
-          <thead><tr><th>Category</th><th>Product</th><th>Paper</th><th>Ink</th><th>Op</th><th>Minutes</th><th></th></tr></thead>
+          <thead><tr><th>Product</th><th>Paper</th><th>Ink</th><th>Op</th><th>Minutes</th><th></th></tr></thead>
           <tbody id="printProductsBody"></tbody>
         </table></div>
       </div>
@@ -1086,6 +1148,9 @@ let state = {
   counters: storageGet('am_counters', null),
   hq: storageGet('am_hq', null),
   partyBookings: storageGet('am_party_bookings', []),
+  partyColors: storageGet('am_party_colors', null),
+  tasks: storageGet('am_tasks', []),
+  teamMembers: storageGet('am_team_members', null),
   partyInventory: storageGet('am_party_inventory', null),
   settings: storageGet('am_settings', {days_per_month:26}),
   activeCategory: 'Food',
@@ -1245,6 +1310,12 @@ if(state.partyInventory === null){
     { id: uid(), name:'4FT Table Cover', category:'Table Covers', specs:'White', stock:5, rate:50, notes:'' },
   ];
 }
+if(state.partyColors === null){
+  state.partyColors = ['White','Black','Red','Blue','Gold'];
+}
+if(state.teamMembers === null){
+  state.teamMembers = [ { id: uid(), name:'You', email:'', color:'#e8963c' } ];
+}
 function persistLocalOnly(){
   storageSet('am_products', state.products);
   storageSet('am_sales', state.sales);
@@ -1263,6 +1334,9 @@ function persistLocalOnly(){
   storageSet('am_settings', state.settings);
   storageSet('am_hq', state.hq);
   storageSet('am_party_bookings', state.partyBookings);
+  storageSet('am_party_colors', state.partyColors);
+  storageSet('am_tasks', state.tasks);
+  storageSet('am_team_members', state.teamMembers);
   storageSet('am_party_inventory', state.partyInventory);
 }
 function saveAll(){
@@ -1337,6 +1411,7 @@ function subscribeToRealtimeUpdates(){
       if(Date.now() - lastPushAt < 1500) return; // this is just our own save echoing back — ignore it
       if(payload.new && payload.new.data && Object.keys(payload.new.data).length){
         const activeCategory = state.activeCategory;
+        checkForNewTaskAssignments(state.tasks, payload.new.data.tasks);
         state = Object.assign(state, payload.new.data);
         state.activeCategory = activeCategory;
         persistLocalOnly();
@@ -1441,7 +1516,9 @@ function renderEverything(){
   renderBookingsPage();
   renderPnJobsList();
   renderPnInventory();
+  renderPartyColorsList();
   renderReportBody(reportActiveTab);
+  renderTasks();
 }
 function renderAll(){
   renderDashboard(); renderInventory(); renderSales(); renderRestock(); renderCustomers(); renderFinances(); renderCostingsList();
@@ -1642,6 +1719,190 @@ function copyReportSummary(range){
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(()=>toast('Copied — paste into Viber/FB')).catch(()=>toast('Could not copy — select manually'));
   } else { toast('Copy not supported here'); }
+}
+
+/* ===================== TASKS ===================== */
+const TASK_STATUSES = ['todo','inprogress','done'];
+let taskSortables = {};
+function initials(name){
+  if(!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return (parts[0][0] + (parts[1]?parts[1][0]:'')).toUpperCase();
+}
+function isOverdue(t){ return t.dueDate && t.status!=='done' && t.dueDate < todayStr(); }
+function priorityBadgeClass(p){ return p==='High' ? 'red' : p==='Medium' ? 'orange' : 'gray'; }
+function renderTasks(){
+  const q = (document.getElementById('taskSearch').value||'').toLowerCase();
+  const myOnly = document.getElementById('taskMyOnly').checked;
+  const myEmail = currentUser ? (currentUser.email||'').toLowerCase() : null;
+  TASK_STATUSES.forEach(status=>{
+    let items = state.tasks.filter(t=>t.status===status);
+    if(q) items = items.filter(t=>(t.title+' '+(t.description||'')).toLowerCase().includes(q));
+    if(myOnly && myEmail){
+      items = items.filter(t=>{
+        const a = state.teamMembers.find(m=>m.id===t.assigneeId);
+        return a && a.email && a.email.toLowerCase()===myEmail;
+      });
+    }
+    document.getElementById('taskCount_'+status).textContent = items.length;
+    const listEl = document.getElementById('taskList_'+status);
+    listEl.innerHTML = items.length ? items.map(t=>{
+      const assignee = state.teamMembers.find(m=>m.id===t.assigneeId);
+      return `<div class="task-card" data-task-id="${t.id}" onclick="openTaskModal('${t.id}')">
+        <div class="task-card-title">${escapeHtml(t.title)}</div>
+        ${t.dueDate ? `<div class="task-card-due ${isOverdue(t)?'overdue':''}">📅 ${t.dueDate}${isOverdue(t)?' — overdue':''}</div>` : ''}
+        <div class="task-card-foot">
+          ${assignee ? `<span class="task-avatar" style="background:${assignee.color||'#e8963c'};" title="${escapeHtml(assignee.name)}">${initials(assignee.name)}</span>` : '<span></span>'}
+          <span class="badge ${priorityBadgeClass(t.priority)}">${escapeHtml(t.priority||'Low')}</span>
+        </div>
+      </div>`;
+    }).join('') : '';
+  });
+  initTaskSortables();
+  updateTaskNavBadge();
+}
+function initTaskSortables(){
+  TASK_STATUSES.forEach(status=>{
+    const el = document.getElementById('taskList_'+status);
+    if(taskSortables[status]) taskSortables[status].destroy();
+    taskSortables[status] = Sortable.create(el, {
+      group: 'tasks', animation: 150, ghostClass: 'sortable-ghost',
+      onEnd: function(evt){
+        const taskId = evt.item.dataset.taskId;
+        const newStatus = evt.to.dataset.status;
+        const t = state.tasks.find(x=>x.id===taskId);
+        if(t && t.status!==newStatus){ t.status = newStatus; saveAll(); renderTasks(); }
+      }
+    });
+  });
+}
+function updateTaskNavBadge(){
+  const badge = document.getElementById('taskNavBadge');
+  if(!currentUser){ badge.style.display='none'; return; }
+  const myEmail = (currentUser.email||'').toLowerCase();
+  const count = state.tasks.filter(t=>{
+    if(t.status==='done') return false;
+    const a = state.teamMembers.find(m=>m.id===t.assigneeId);
+    return a && a.email && a.email.toLowerCase()===myEmail;
+  }).length;
+  if(count>0){ badge.textContent = count; badge.style.display='inline-block'; } else { badge.style.display='none'; }
+}
+function openTaskModal(id){
+  const t = id ? state.tasks.find(x=>x.id===id) : null;
+  const assigneeOptions = state.teamMembers.map(m=>`<option value="${m.id}" ${t&&t.assigneeId===m.id?'selected':''}>${escapeHtml(m.name)}</option>`).join('');
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${t?'Edit':'Add'} Task</h3>
+    <div class="field"><label>Title</label><input id="tk_title" value="${t?escapeHtml(t.title):''}" placeholder="e.g. Restock chairs for Aug 20 event"></div>
+    <div class="field"><label>Description</label><textarea id="tk_desc" rows="3">${t?escapeHtml(t.description||''):''}</textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Assignee</label><select id="tk_assignee"><option value="">— Unassigned —</option>${assigneeOptions}</select></div>
+      <div class="field"><label>Priority</label><select id="tk_priority">${['Low','Medium','High'].map(p=>`<option ${t&&t.priority===p?'selected':''}>${p}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Due Date</label><input type="date" id="tk_due" value="${t?t.dueDate||'':''}"></div>
+      <div class="field"><label>Status</label><select id="tk_status">
+        <option value="todo" ${!t||t.status==='todo'?'selected':''}>To Do</option>
+        <option value="inprogress" ${t&&t.status==='inprogress'?'selected':''}>In Progress</option>
+        <option value="done" ${t&&t.status==='done'?'selected':''}>Done</option>
+      </select></div>
+    </div>
+    <div class="modal-actions">
+      ${t?`<button class="btn danger" onclick="deleteTask('${t.id}',true)">Delete</button>`:''}
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveTask(${t?`'${t.id}'`:'null'})">Save</button>
+    </div>`;
+  openModal();
+}
+function saveTask(id){
+  const title = document.getElementById('tk_title').value.trim();
+  if(!title){ toast('Title is required'); return; }
+  const payload = {
+    title, description: document.getElementById('tk_desc').value.trim(),
+    assigneeId: document.getElementById('tk_assignee').value || null,
+    priority: document.getElementById('tk_priority').value,
+    dueDate: document.getElementById('tk_due').value || null,
+    status: document.getElementById('tk_status').value,
+  };
+  if(id){ const t = state.tasks.find(x=>x.id===id); Object.assign(t, payload); }
+  else { state.tasks.unshift({ id: uid(), createdAt: new Date().toISOString(), ...payload }); }
+  saveAll(); closeModal(); toast('Task saved'); renderTasks();
+}
+function deleteTask(id, fromModal){
+  if(!confirm('Delete this task?')) return;
+  state.tasks = state.tasks.filter(t=>t.id!==id);
+  saveAll();
+  if(fromModal) closeModal();
+  renderTasks();
+}
+
+/* Team roster — lightweight, used for assignment + notification matching */
+function openTeamModal(){
+  document.getElementById('modalBody').innerHTML = `
+    <h3>👥 Team Members</h3>
+    <div class="flag-hint" style="margin-bottom:12px;">Add each teammate's email exactly as their login — that's how they get notified when assigned a task.</div>
+    <div id="teamList" style="margin-bottom:14px;"></div>
+    <div class="field-row">
+      <input id="tm_name" placeholder="Name">
+      <input id="tm_email" placeholder="Email (optional)">
+    </div>
+    <button class="btn small secondary" style="width:100%; justify-content:center; margin-top:8px;" onclick="addTeamMember()">+ Add Member</button>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Done</button></div>`;
+  renderTeamList();
+  openModal();
+}
+const avatarColors = ['#e8963c','#6bab6a','#d1596b','#5b8cd6','#d4af5a','#a86bd1'];
+function renderTeamList(){
+  const wrap = document.getElementById('teamList');
+  if(!wrap) return;
+  wrap.innerHTML = state.teamMembers.map(m=>`
+    <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);">
+      <span class="task-avatar" style="background:${m.color};">${initials(m.name)}</span>
+      <div style="flex:1;"><div style="font-size:13px; font-weight:600;">${escapeHtml(m.name)}</div><div style="font-size:11px; color:var(--text-muted);">${escapeHtml(m.email||'no email set')}</div></div>
+      <button class="icon-btn" onclick="removeTeamMember('${m.id}')">🗑️</button>
+    </div>`).join('');
+}
+function addTeamMember(){
+  const name = document.getElementById('tm_name').value.trim();
+  const email = document.getElementById('tm_email').value.trim();
+  if(!name){ toast('Enter a name'); return; }
+  const color = avatarColors[state.teamMembers.length % avatarColors.length];
+  state.teamMembers.push({ id: uid(), name, email, color });
+  saveAll(); document.getElementById('tm_name').value=''; document.getElementById('tm_email').value='';
+  renderTeamList(); toast('Added');
+}
+function removeTeamMember(id){
+  if(!confirm('Remove this team member? Their assigned tasks will become unassigned.')) return;
+  state.teamMembers = state.teamMembers.filter(m=>m.id!==id);
+  state.tasks.forEach(t=>{ if(t.assigneeId===id) t.assigneeId=null; });
+  saveAll(); renderTeamList(); renderTasks();
+}
+
+/* Browser notifications for new assignments */
+function enableTaskNotifications(){
+  if(!('Notification' in window)){ toast('Notifications not supported on this browser'); return; }
+  Notification.requestPermission().then(perm=>{
+    if(perm==='granted') toast('🔔 Notifications enabled on this device');
+    else toast('Notifications blocked — enable them in your browser settings to use this');
+  });
+}
+function notifyTaskAssigned(taskTitle){
+  toast('🔔 New task assigned to you: '+taskTitle);
+  if(window.Notification && Notification.permission==='granted'){
+    try{ new Notification('New task assigned to you', { body: taskTitle }); }catch(e){}
+  }
+}
+function checkForNewTaskAssignments(oldTasks, newTasks){
+  if(!currentUser) return;
+  const myEmail = (currentUser.email||'').toLowerCase();
+  if(!myEmail) return;
+  const oldById = {}; (oldTasks||[]).forEach(t=>oldById[t.id]=t);
+  (newTasks||[]).forEach(t=>{
+    const assignee = state.teamMembers.find(m=>m.id===t.assigneeId);
+    const isMe = assignee && assignee.email && assignee.email.toLowerCase()===myEmail;
+    if(!isMe) return;
+    const prev = oldById[t.id];
+    if(!prev || prev.assigneeId!==t.assigneeId){ notifyTaskAssigned(t.title); }
+  });
 }
 
 /* ===================== DASHBOARD ===================== */
@@ -2385,15 +2646,40 @@ function backToEventList(){
   renderPnEventsList();
 }
 function renderPnReqRows(){
-  document.getElementById('pnReqRows').innerHTML = pnDraft.rentalItems.length ? pnDraft.rentalItems.map((r,i)=>`
-    <div class="cost-row" style="grid-template-columns:1.2fr 0.8fr 0.5fr 0.6fr auto;">
-      <input value="${escapeHtml(r.item)}" placeholder="Item" oninput="updatePnReq(${i},'item',this.value)">
-      <input value="${escapeHtml(r.specs||'')}" placeholder="Specs" oninput="updatePnReq(${i},'specs',this.value)">
+  const wrap = document.getElementById('pnReqRows');
+  if(!pnDraft.rentalItems.length){ wrap.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:12px;">No items yet.</div>`; renderPnTotals(); return; }
+  const specOptionsHtml = (selected) => '<option value="">— none —</option>' + state.partyColors.map(c=>`<option ${selected===c?'selected':''}>${escapeHtml(c)}</option>`).join('') + '<option value="__custom__">✏️ Custom</option>';
+  wrap.innerHTML = pnDraft.rentalItems.map((r,i)=>{
+    const matched = state.partyInventory.find(p=>p.name===r.item);
+    const itemOptions = '<option value="__custom__">✏️ Custom Item</option>' + state.partyInventory.map(p=>`<option value="${p.id}" ${matched&&matched.id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+    const showCustomItem = !matched;
+    const specIsCustom = r.specs && !state.partyColors.includes(r.specs);
+    return `
+    <div class="cost-row" style="grid-template-columns:1.2fr 0.8fr 0.5fr 0.6fr auto; margin-bottom:${showCustomItem||specIsCustom?'4px':'8px'};">
+      <select onchange="onPnReqItemPick(${i}, this.value)">${itemOptions}</select>
+      <select onchange="onPnReqSpecPick(${i}, this.value)">${specOptionsHtml(specIsCustom?'__custom__':r.specs)}</select>
       <input type="number" step="any" value="${r.qty}" oninput="updatePnReq(${i},'qty',this.value)">
       <input type="number" step="any" value="${r.price}" oninput="updatePnReq(${i},'price',this.value)">
       <button class="icon-btn" onclick="removePnReq(${i})">🗑️</button>
-    </div>`).join('') : `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:12px;">No items yet.</div>`;
+    </div>
+    ${showCustomItem ? `<input value="${escapeHtml(r.item||'')}" placeholder="Custom item name" oninput="updatePnReq(${i},'item',this.value)" style="margin-bottom:6px;">` : ''}
+    ${specIsCustom ? `<input value="${escapeHtml(r.specs||'')}" placeholder="Custom spec" oninput="updatePnReq(${i},'specs',this.value)" style="margin-bottom:6px;">` : ''}
+    `;
+  }).join('');
   renderPnTotals();
+}
+function onPnReqItemPick(i, val){
+  if(val==='__custom__'){ pnDraft.rentalItems[i].item=''; renderPnReqRows(); return; }
+  const p = state.partyInventory.find(x=>x.id===val);
+  if(!p) return;
+  pnDraft.rentalItems[i].item = p.name;
+  pnDraft.rentalItems[i].price = Number(p.rate)||0;
+  if(p.specs && !pnDraft.rentalItems[i].specs) pnDraft.rentalItems[i].specs = p.specs;
+  renderPnReqRows();
+}
+function onPnReqSpecPick(i, val){
+  pnDraft.rentalItems[i].specs = (val==='__custom__') ? '' : val;
+  renderPnReqRows();
 }
 function addPnReqRow(){ pnDraft.rentalItems.push({item:'',specs:'',qty:1,price:0}); renderPnReqRows(); }
 function updatePnReq(i,field,val){ pnDraft.rentalItems[i][field] = (field==='item'||field==='specs')?val:(Number(val)||0); renderPnTotals(); }
@@ -2610,6 +2896,26 @@ function savePnInventory(id){
 }
 function deletePnInventory(id){ if(!confirm('Delete this item?')) return; state.partyInventory = state.partyInventory.filter(p=>p.id!==id); saveAll(); renderPnInventory(); }
 
+/* Specs / Colors — feeds the Event Quotation specs dropdown */
+function renderPartyColorsList(){
+  const wrap = document.getElementById('partyColorsList');
+  if(!wrap) return;
+  if(!state.partyColors.length){ wrap.innerHTML = '<div class="flag-hint">No colors yet — add your first one.</div>'; return; }
+  wrap.innerHTML = state.partyColors.map((c,i)=>`<span class="badge gray" style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px;">${escapeHtml(c)} <button class="icon-btn" style="padding:0; font-size:11px; color:var(--red);" onclick="removePartyColor(${i})">✕</button></span>`).join('');
+}
+function addPartyColor(){
+  const c = prompt('New color / spec name:');
+  if(!c || !c.trim()) return;
+  if(state.partyColors.some(x=>x.toLowerCase()===c.trim().toLowerCase())){ toast('Already exists'); return; }
+  state.partyColors.push(c.trim());
+  saveAll(); renderPartyColorsList(); toast('Added');
+}
+function removePartyColor(i){
+  if(!confirm('Remove this color?')) return;
+  state.partyColors.splice(i,1);
+  saveAll(); renderPartyColorsList();
+}
+
 /* ===================== JOB ORDERS ===================== */
 let jobOrderDraft = null;
 let joActiveFilter = 'All';
@@ -2759,20 +3065,27 @@ function exportJobOrdersCsv(){
 }
 
 /* ===================== MANAGE PRODUCTS (catalog CRUD) ===================== */
+let mpActiveCategory = null;
 function renderPrintProducts(){
+  const categories = [...new Set(state.printProducts.map(p=>p.category))];
+  if(!mpActiveCategory || !categories.includes(mpActiveCategory)) mpActiveCategory = categories[0] || null;
+  const tabsEl = document.getElementById('mpCategoryTabs');
+  tabsEl.innerHTML = categories.map(c=>`<div class="tab ${c===mpActiveCategory?'active':''}" onclick="selectMpCategory('${c.replace(/'/g,"\\'")}')">${escapeHtml(c)}</div>`).join('');
   const body = document.getElementById('printProductsBody');
-  if(!state.printProducts.length){ body.innerHTML = `<tr class="empty-row"><td colspan="7">No products yet — add your first one.</td></tr>`; return; }
-  body.innerHTML = state.printProducts.map(p=>`<tr>
-    <td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.name)}</td><td>${peso(p.paper)}</td><td>${peso(p.ink)}</td><td>${peso(p.op)}</td><td>${p.minutes}</td>
+  const items = mpActiveCategory ? state.printProducts.filter(p=>p.category===mpActiveCategory) : [];
+  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No products in this category yet.</td></tr>`; return; }
+  body.innerHTML = items.map(p=>`<tr>
+    <td>${escapeHtml(p.name)}</td><td>${peso(p.paper)}</td><td>${peso(p.ink)}</td><td>${peso(p.op)}</td><td>${p.minutes}</td>
     <td><button class="icon-btn" onclick="openProductTemplateModal('${p.id}')">✏️</button><button class="icon-btn" onclick="deleteProductTemplate('${p.id}')">🗑️</button></td>
   </tr>`).join('');
 }
+function selectMpCategory(c){ mpActiveCategory = c; renderPrintProducts(); }
 function openProductTemplateModal(id){
   const p = id ? state.printProducts.find(x=>x.id===id) : null;
   const categories = [...new Set(state.printProducts.map(x=>x.category))];
   document.getElementById('modalBody').innerHTML = `
     <h3>${p?'Edit':'Add'} Product</h3>
-    <div class="field"><label>Category</label><input id="pt_category" list="pt_categoryList" value="${p?escapeHtml(p.category):''}" placeholder="e.g. Photoprint (existing or new)"></div>
+    <div class="field"><label>Category</label><input id="pt_category" list="pt_categoryList" value="${p?escapeHtml(p.category):(mpActiveCategory?escapeHtml(mpActiveCategory):'')}" placeholder="e.g. Photoprint (existing or new)"></div>
     <datalist id="pt_categoryList">${categories.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
     <div class="field"><label>Product Name</label><input id="pt_name" value="${p?escapeHtml(p.name):''}" placeholder="e.g. 4R Size"></div>
     <div class="field-row">
@@ -2803,6 +3116,7 @@ function saveProductTemplate(id){
   };
   if(id){ const p = state.printProducts.find(x=>x.id===id); Object.assign(p, payload); }
   else { state.printProducts.push({ id: uid(), ...payload }); }
+  mpActiveCategory = category;
   saveAll(); closeModal(); toast('Product saved'); buildProductSelect(); renderPrintProducts(); renderCheatSheetHints(); populatePrintProductSuggestions();
 }
 function deleteProductTemplate(id, fromModal){
