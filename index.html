@@ -138,6 +138,22 @@
   .task-avatar{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#1c1305; flex-shrink:0; }
   .nav-badge{ background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-left:auto; }
 
+  /* HQ BLOCKS (Notion-style) */
+  #hqBlocksContainer{ display:grid; grid-template-columns:repeat(2,1fr); gap:16px; align-items:start; }
+  @media(max-width:900px){ #hqBlocksContainer{ grid-template-columns:1fr; } }
+  .hq-block{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .hq-block-full{ grid-column:1/-1; }
+  .hq-block-divider{ background:transparent; border:none; }
+  .hq-block-header{ display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--border); }
+  .hq-block-divider .hq-block-header{ border-bottom:none; padding:18px 4px 6px; }
+  .hq-block-drag{ cursor:grab; color:var(--text-muted); font-size:14px; user-select:none; }
+  .hq-block-title{ flex:1; font-size:14px; font-weight:600; }
+  .hq-block-divider .hq-block-title{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--amber); border-bottom:1px solid var(--border); padding-bottom:8px; }
+  .hq-block-actions{ display:flex; gap:2px; flex-shrink:0; }
+  .hq-block-body{ padding:14px 16px; }
+  .hq-block.sortable-ghost{ opacity:.3; }
+  .hq-mission-field label{ margin-bottom:4px; }
+
   @media print{
     body *{ visibility:hidden; }
     #ridPageInner, #ridPageInner *, #sgPageInner, #sgPageInner *{ visibility:visible; }
@@ -199,6 +215,7 @@
       <div class="nav-item" data-page="pnJobOrders"><span class="nav-icon">📋</span> Job Order</div>
       <div class="nav-item" data-page="pnInventory"><span class="nav-icon">🪑</span> Inventory</div>
       <div class="nav-divider">Settings</div>
+      <div class="nav-item" data-page="team"><span class="nav-icon">👥</span> Team</div>
       <div class="nav-item" data-page="bir"><span class="nav-icon">🏛️</span> BIR Calculator</div>
       <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</div>
     </nav>
@@ -256,36 +273,10 @@
     <!-- HQ COMMAND CENTER -->
     <div class="page" id="page-hq">
       <div class="page-head">
-        <div><h1>🏛️ Command Center</h1><div class="sub">Mission, priorities, roadmap — the strategic view of the whole business</div></div>
+        <div><h1>🏛️ Command Center</h1><div class="sub">Drag ⠿ to reorder, tap ⛶ to resize, add your own blocks anytime</div></div>
+        <button class="btn" onclick="openAddHqBlockModal()">+ Add Block</button>
       </div>
-
-      <div class="two-col" style="margin-bottom:16px;">
-        <div class="card" id="hqCard_mission" style="padding:18px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h3 style="font-size:14px;">🎯 Mission Control</h3>
-            <button class="btn small" onclick="openMissionModal()">✏️ Edit</button>
-          </div>
-          <div id="hqMissionBody"></div>
-        </div>
-        <div class="card" id="hqCard_ideaPipeline" style="padding:0;"></div>
-      </div>
-
-      <div class="two-col" style="margin-bottom:16px;">
-        <div class="card" id="hqCard_priorities" style="padding:0;"></div>
-        <div class="card" id="hqCard_marketing" style="padding:0;"></div>
-      </div>
-
-      <div class="two-col" style="margin-bottom:16px;">
-        <div class="card" id="hqCard_storeMap" style="padding:0;"></div>
-        <div class="card" id="hqCard_notesLog" style="padding:0;"></div>
-      </div>
-
-      <div class="two-col" style="margin-bottom:16px;">
-        <div class="card" id="hqCard_roadmap" style="padding:0;"></div>
-        <div class="card" id="hqCard_opportunities" style="padding:0;"></div>
-      </div>
-
-      <div class="card" id="hqCard_problems" style="padding:0;"></div>
+      <div id="hqBlocksContainer"></div>
     </div>
 
     <!-- DASHBOARD -->
@@ -1041,6 +1032,14 @@
       </div>
     </div>
 
+    <!-- TEAM -->
+    <div class="page" id="page-team">
+      <div class="page-head">
+        <div><h1>👥 Team</h1><div class="sub">Everyone who's signed in — this is who tasks can be assigned to. Managed by who has a login, not by typing names in manually.</div></div>
+      </div>
+      <div id="teamPageBody"></div>
+    </div>
+
     <!-- BIR CALCULATOR -->
     <div class="page" id="page-bir">
       <div class="page-head"><div><h1>BIR Tax Calculator</h1><div class="sub">Estimate your income tax — for planning only</div></div></div>
@@ -1147,6 +1146,7 @@ let state = {
   quotations: storageGet('am_quotations', []),
   counters: storageGet('am_counters', null),
   hq: storageGet('am_hq', null),
+  hqBlocks: storageGet('am_hq_blocks', null),
   partyBookings: storageGet('am_party_bookings', []),
   partyColors: storageGet('am_party_colors', null),
   tasks: storageGet('am_tasks', []),
@@ -1295,6 +1295,46 @@ if(state.hq === null){
     ],
   };
 }
+if(state.hqBlocks === null){
+  const STATUS_OPTS = ['Planning','Designing','Prototype','Active','Future','Done','Cancelled'];
+  const PRIORITY_OPTS = ['High','Medium','Low'];
+  const DIFFICULTY_OPTS = ['Easy','Medium','Hard'];
+  const STAR_OPTS = ['⭐','⭐⭐','⭐⭐⭐','⭐⭐⭐⭐','⭐⭐⭐⭐⭐'];
+  const T = (title,size,columns,rows)=>({ id:uid(), type:'table', size, title, columns, rows: (rows||[]).map(r=>({...r})) });
+  state.hqBlocks = [
+    { id: uid(), type:'mission', size:'full', title:'🎯 Mission Control', data: {...state.hq.mission} },
+    T('💡 Idea Pipeline — Student Attraction','half',[
+      {key:'idea',label:'Idea',type:'text'},{key:'goal',label:'Goal',type:'text'},{key:'budget',label:'Budget',type:'text'},
+      {key:'difficulty',label:'Difficulty',type:'select',options:DIFFICULTY_OPTS},{key:'priority',label:'Priority',type:'select',options:STAR_OPTS},
+      {key:'status',label:'Status',type:'select',options:STATUS_OPTS},
+    ], state.hq.ideaPipeline),
+    T('🚀 Current Priorities — Projects in Motion','half',[
+      {key:'project',label:'Project',type:'text'},{key:'budget',label:'Budget (₱)',type:'text'},{key:'roi',label:'ROI',type:'select',options:STAR_OPTS},
+      {key:'priority',label:'Priority',type:'select',options:PRIORITY_OPTS},{key:'status',label:'Status',type:'select',options:STATUS_OPTS},
+      {key:'notes',label:'Notes',type:'text'},
+    ], state.hq.priorities),
+    T('📣 Local Marketing Tracker','half',[
+      {key:'activity',label:'Activity',type:'text'},{key:'frequency',label:'Frequency',type:'text'},{key:'owner',label:'Owner',type:'text'},
+      {key:'status',label:'Status',type:'select',options:STATUS_OPTS},{key:'notes',label:'Notes',type:'text'},
+    ], state.hq.marketing),
+    T('🏪 Store Experience Map','half',[
+      {key:'area',label:'Store Area',type:'text'},{key:'mainCustomer',label:'Main Customer',type:'text'},{key:'objective',label:'Objective',type:'text'},{key:'notes',label:'Notes',type:'text'},
+    ], state.hq.storeMap),
+    T('📝 Notes & Improvement Log','half',[
+      {key:'date',label:'Date',type:'text'},{key:'area',label:'Area',type:'text'},{key:'note',label:'Note / Observation',type:'text'},{key:'actionNeeded',label:'Action Needed',type:'text'},
+    ], state.hq.notesLog),
+    T('🗺️ Business Roadmap','half',[
+      {key:'phase',label:'Phase',type:'text'},{key:'objective',label:'Objective',type:'text'},{key:'status',label:'Status',type:'select',options:STATUS_OPTS},{key:'notes',label:'Notes',type:'text'},
+    ], state.hq.roadmap),
+    T('🌟 Opportunity Backlog','half',[
+      {key:'idea',label:'Idea',type:'text'},{key:'potential',label:'Potential',type:'select',options:STAR_OPTS},{key:'effort',label:'Effort',type:'select',options:DIFFICULTY_OPTS},
+      {key:'status',label:'Status',type:'select',options:STATUS_OPTS},{key:'notes',label:'Notes',type:'text'},
+    ], state.hq.opportunities),
+    T('❤️ Customer Problems We Solve','full',[
+      {key:'customer',label:'Customer',type:'text'},{key:'problem',label:'Problem',type:'text'},{key:'solution',label:'Our Solution',type:'text'},{key:'impact',label:'Impact',type:'select',options:STAR_OPTS},
+    ], state.hq.problems),
+  ];
+}
 if(state.stickerGuides === null){
   state.stickerGuides = [
     { id: uid(), title:'Common Sticker Sizes', details:'2×2in and 3×3in for individual labels; 4×4in for bigger designs; full A4 sheet for custom die-cuts or multi-design sheets.' },
@@ -1314,7 +1354,7 @@ if(state.partyColors === null){
   state.partyColors = ['White','Black','Red','Blue','Gold'];
 }
 if(state.teamMembers === null){
-  state.teamMembers = [ { id: uid(), name:'You', email:'', color:'#e8963c' } ];
+  state.teamMembers = [];
 }
 function persistLocalOnly(){
   storageSet('am_products', state.products);
@@ -1333,6 +1373,7 @@ function persistLocalOnly(){
   storageSet('am_counters', state.counters);
   storageSet('am_settings', state.settings);
   storageSet('am_hq', state.hq);
+  storageSet('am_hq_blocks', state.hqBlocks);
   storageSet('am_party_bookings', state.partyBookings);
   storageSet('am_party_colors', state.partyColors);
   storageSet('am_tasks', state.tasks);
@@ -1451,6 +1492,7 @@ async function doLogin(){
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   await pullFromSupabase();
+  ensureCurrentUserInTeam();
   renderEverything();
   subscribeToRealtimeUpdates();
 }
@@ -1486,6 +1528,7 @@ async function boot(){
   if(!authed){ return; } // login screen is showing; boot resumes via doLogin()
   document.getElementById('app').style.display = 'flex';
   await pullFromSupabase();
+  ensureCurrentUserInTeam();
   renderEverything();
   subscribeToRealtimeUpdates();
 }
@@ -1510,8 +1553,7 @@ function renderEverything(){
   renderJobOrdersList();
   renderJoStats();
   renderBir();
-  renderMission();
-  Object.keys(hqTableDefs).forEach(renderHqSection);
+  renderHqBlocks();
   renderPnEventsList();
   renderBookingsPage();
   renderPnJobsList();
@@ -1519,6 +1561,7 @@ function renderEverything(){
   renderPartyColorsList();
   renderReportBody(reportActiveTab);
   renderTasks();
+  renderTeamPage();
 }
 function renderAll(){
   renderDashboard(); renderInventory(); renderSales(); renderRestock(); renderCustomers(); renderFinances(); renderCostingsList();
@@ -1535,97 +1578,202 @@ const missionFields = [
   {key:'storeHours', label:'Store Hours'},
   {key:'keyPeaks', label:'Key Peaks'},
 ];
-function renderMission(){
-  const m = state.hq.mission;
-  document.getElementById('hqMissionBody').innerHTML = missionFields.map(f=>`
-    <div style="margin-bottom:10px;">
-      <div class="stat-label" style="margin-bottom:2px;">${escapeHtml(f.label)}</div>
-      <div style="font-size:13px; line-height:1.5;">${escapeHtml(m[f.key]||'—')}</div>
-    </div>`).join('');
+function computeStoreOpenStatus(hoursStr){
+  if(!hoursStr) return '—';
+  const matches = hoursStr.match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])/g);
+  if(!matches || matches.length<2) return '—';
+  function toMinutes(t){
+    const m = t.match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])/);
+    let h = parseInt(m[1],10)%12; const min=parseInt(m[2],10); if(/p/i.test(m[3])) h+=12;
+    return h*60+min;
+  }
+  const openMin = toMinutes(matches[0]), closeMin = toMinutes(matches[1]);
+  const now = new Date(); const nowMin = now.getHours()*60+now.getMinutes();
+  const isOpen = openMin<=closeMin ? (nowMin>=openMin && nowMin<closeMin) : (nowMin>=openMin || nowMin<closeMin);
+  return isOpen ? '🟢 Open now' : '🔴 Closed now';
 }
-function openMissionModal(){
-  const m = state.hq.mission;
-  document.getElementById('modalBody').innerHTML = `
-    <h3>Edit Mission Control</h3>
-    ${missionFields.map(f=>`<div class="field"><label>${escapeHtml(f.label)}</label><input id="mf_${f.key}" value="${m[f.key]?escapeHtml(m[f.key]):''}"></div>`).join('')}
-    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveMission()">Save</button></div>`;
-  openModal();
+function countAcrossTableBlocks(colKey, matchValues){
+  let count=0;
+  state.hqBlocks.forEach(b=>{
+    if(b.type!=='table') return;
+    if(!b.columns.some(c=>c.key===colKey)) return;
+    b.rows.forEach(r=>{ if(matchValues.includes(r[colKey])) count++; });
+  });
+  return count;
 }
-function saveMission(){
-  missionFields.forEach(f=>{ state.hq.mission[f.key] = document.getElementById('mf_'+f.key).value.trim(); });
-  saveAll(); closeModal(); toast('Saved'); renderMission();
-}
-
-const hqTableDefs = {
-  ideaPipeline: { title:'💡 Idea Pipeline — Student Attraction', cols:[
-    {key:'idea',label:'Idea'},{key:'goal',label:'Goal'},{key:'budget',label:'Budget'},{key:'difficulty',label:'Difficulty'},{key:'priority',label:'Priority',star:true},{key:'status',label:'Status'}
-  ]},
-  priorities: { title:'🚀 Current Priorities — Projects in Motion', cols:[
-    {key:'project',label:'Project'},{key:'budget',label:'Budget (₱)'},{key:'roi',label:'ROI',star:true},{key:'priority',label:'Priority'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
-  ]},
-  marketing: { title:'📣 Local Marketing Tracker', cols:[
-    {key:'activity',label:'Activity'},{key:'frequency',label:'Frequency'},{key:'owner',label:'Owner'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
-  ]},
-  storeMap: { title:'🏪 Store Experience Map', cols:[
-    {key:'area',label:'Store Area'},{key:'mainCustomer',label:'Main Customer'},{key:'objective',label:'Objective'},{key:'notes',label:'Notes'}
-  ]},
-  notesLog: { title:'📝 Notes & Improvement Log', cols:[
-    {key:'date',label:'Date'},{key:'area',label:'Area'},{key:'note',label:'Note / Observation'},{key:'actionNeeded',label:'Action Needed'}
-  ]},
-  roadmap: { title:'🗺️ Business Roadmap', cols:[
-    {key:'phase',label:'Phase'},{key:'objective',label:'Objective'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
-  ]},
-  opportunities: { title:'🌟 Opportunity Backlog', cols:[
-    {key:'idea',label:'Idea'},{key:'potential',label:'Potential',star:true},{key:'effort',label:'Effort'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
-  ]},
-  problems: { title:'❤️ Customer Problems We Solve', cols:[
-    {key:'customer',label:'Customer'},{key:'problem',label:'Problem'},{key:'solution',label:'Our Solution'},{key:'impact',label:'Impact',star:true}
-  ]},
-};
-function renderHqSection(key){
-  const def = hqTableDefs[key];
-  const rows = state.hq[key];
-  const container = document.getElementById('hqCard_'+key);
-  if(!container) return;
-  const theadCols = def.cols.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('');
-  const tbodyRows = rows.length ? rows.map((r,i)=>`<tr>${def.cols.map(c=>`<td>${escapeHtml(r[c.key]||'—')}</td>`).join('')}<td style="white-space:nowrap;"><button class="icon-btn" onclick="openHqRowModal('${key}',${i})">✏️</button><button class="icon-btn" onclick="deleteHqRow('${key}',${i})">🗑️</button></td></tr>`).join('') : `<tr class="empty-row"><td colspan="${def.cols.length+1}">Nothing here yet.</td></tr>`;
-  container.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 18px 0;">
-      <h3 style="font-size:14px;">${def.title}</h3>
-      <button class="btn small" onclick="openHqRowModal('${key}', null)">+ Add</button>
+const missionIconMap = { currentMission:'🎯', primaryTargets:'🎯', currentStage:'📈', northStar:'⭐', currentFocus:'🔍', competitiveEdge:'⚔️', storeHours:'🕐', keyPeaks:'⏰' };
+function renderMissionBlockBody(b){
+  const m = b.data;
+  const openStatus = computeStoreOpenStatus(m.storeHours);
+  const activeCount = countAcrossTableBlocks('status', ['Active']);
+  const doneCount = countAcrossTableBlocks('status', ['Done']);
+  return `
+    <div class="grid grid-stats" style="margin-bottom:16px;">
+      <div class="card"><div class="stat-label">Store Status</div><div class="stat-value" style="font-size:16px;">${openStatus}</div></div>
+      <div class="card"><div class="stat-label">Active Projects</div><div class="stat-value amber" style="font-size:20px;">${activeCount}</div></div>
+      <div class="card"><div class="stat-label">Completed Milestones</div><div class="stat-value green" style="font-size:20px;">${doneCount}</div></div>
     </div>
-    <div class="table-wrap" style="margin-top:10px;"><table><thead><tr>${theadCols}<th></th></tr></thead><tbody>${tbodyRows}</tbody></table></div>`;
-}
-function openHqRowModal(key, idx){
-  const def = hqTableDefs[key];
-  const row = (idx!==null && idx!==undefined) ? state.hq[key][idx] : {};
-  const starOpts = ['⭐','⭐⭐','⭐⭐⭐','⭐⭐⭐⭐','⭐⭐⭐⭐⭐'];
-  document.getElementById('modalBody').innerHTML = `
-    <h3>${(idx!==null && idx!==undefined)?'Edit':'Add'} Entry</h3>
-    ${def.cols.map(c=>{
-      if(c.star){ return `<div class="field"><label>${escapeHtml(c.label)}</label><select id="hqf_${c.key}">${starOpts.map(o=>`<option ${row[c.key]===o?'selected':''}>${o}</option>`).join('')}</select></div>`; }
-      return `<div class="field"><label>${escapeHtml(c.label)}</label><input id="hqf_${c.key}" value="${row[c.key]?escapeHtml(row[c.key]):''}"></div>`;
-    }).join('')}
-    <div class="modal-actions">
-      ${(idx!==null && idx!==undefined)?`<button class="btn danger" onclick="deleteHqRow('${key}',${idx},true)">Delete</button>`:''}
-      <button class="btn secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn" onclick="saveHqRow('${key}', ${(idx!==null && idx!==undefined)?idx:'null'})">Save</button>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px;">
+      ${missionFields.map(f=>`
+        <div class="hq-mission-field">
+          <label>${missionIconMap[f.key]||'•'} ${escapeHtml(f.label)}</label>
+          <input value="${escapeHtml(m[f.key]||'')}" oninput="updateMissionField('${b.id}','${f.key}',this.value)">
+        </div>`).join('')}
     </div>`;
+}
+function updateMissionField(blockId, key, val){
+  const b = state.hqBlocks.find(x=>x.id===blockId); if(!b) return;
+  b.data[key] = val; saveAll();
+}
+function renderTextBlockBody(b){
+  return `<textarea rows="5" style="width:100%;" oninput="updateHqTextBlock('${b.id}',this.value)" placeholder="Write anything — notes, reminders, context...">${escapeHtml(b.content||'')}</textarea>`;
+}
+function updateHqTextBlock(id, val){
+  const b = state.hqBlocks.find(x=>x.id===id); if(!b) return;
+  b.content = val; saveAll();
+}
+function renderHqCellInput(blockId, rowIdx, col, val){
+  if(col.type==='select'){
+    const opts = (col.options||[]).map(o=>`<option ${val===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+    return `<select onchange="updateHqCell('${blockId}',${rowIdx},'${col.key}',this.value)"><option value="">—</option>${opts}</select>`;
+  }
+  if(col.type==='number'){
+    return `<input type="number" step="any" value="${val!=null&&val!==''?val:''}" oninput="updateHqCell('${blockId}',${rowIdx},'${col.key}',this.value,true)">`;
+  }
+  return `<input value="${escapeHtml(val||'')}" oninput="updateHqCell('${blockId}',${rowIdx},'${col.key}',this.value)">`;
+}
+function renderTableBlockBody(b){
+  const headHtml = b.columns.map((c,ci)=>`<th>${escapeHtml(c.label)} <button class="icon-btn" style="padding:0 2px; font-size:10px;" onclick="deleteHqColumn('${b.id}',${ci})" title="Delete column">✕</button></th>`).join('');
+  const rowsHtml = b.rows.length ? b.rows.map((r,ri)=>`<tr>${b.columns.map(c=>`<td>${renderHqCellInput(b.id,ri,c,r[c.key])}</td>`).join('')}<td><button class="icon-btn" onclick="deleteHqTableRow('${b.id}',${ri})">🗑️</button></td></tr>`).join('') : `<tr class="empty-row"><td colspan="${b.columns.length+1}">No rows yet.</td></tr>`;
+  return `<div class="table-wrap"><table><thead><tr>${headHtml}<th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+    <button class="btn small secondary" style="margin-top:10px;" onclick="addHqTableRow('${b.id}')">+ Add Row</button>`;
+}
+function updateHqCell(blockId, rowIdx, key, val, isNumber){
+  const b = state.hqBlocks.find(x=>x.id===blockId); if(!b) return;
+  b.rows[rowIdx][key] = isNumber ? (Number(val)||0) : val;
+  saveAll();
+}
+function addHqTableRow(blockId){
+  const b = state.hqBlocks.find(x=>x.id===blockId); if(!b) return;
+  const row = {}; b.columns.forEach(c=>row[c.key] = c.type==='number' ? 0 : '');
+  b.rows.push(row);
+  saveAll(); renderHqBlocks();
+}
+function deleteHqTableRow(blockId, idx){
+  const b = state.hqBlocks.find(x=>x.id===blockId); if(!b) return;
+  if(!confirm('Delete this row?')) return;
+  b.rows.splice(idx,1);
+  saveAll(); renderHqBlocks();
+}
+function deleteHqColumn(blockId, idx){
+  const b = state.hqBlocks.find(x=>x.id===blockId); if(!b) return;
+  if(b.columns.length<=1){ toast('A table needs at least one column'); return; }
+  if(!confirm('Delete this column? Data in it will be lost.')) return;
+  const key = b.columns[idx].key;
+  b.columns.splice(idx,1);
+  b.rows.forEach(r=>delete r[key]);
+  saveAll(); renderHqBlocks();
+}
+function openHqColumnModal(blockId){
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Add Column</h3>
+    <div class="field"><label>Column Name</label><input id="col_name" placeholder="e.g. Owner"></div>
+    <div class="field"><label>Type</label><select id="col_type" onchange="onHqColTypeChange()">
+      <option value="text">Text</option><option value="select">Dropdown</option><option value="number">Number</option>
+    </select></div>
+    <div class="field" id="col_options_wrap" style="display:none;"><label>Dropdown Options (comma-separated)</label><input id="col_options" placeholder="e.g. High, Medium, Low"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveHqColumn('${blockId}')">Add Column</button></div>`;
   openModal();
 }
-function saveHqRow(key, idx){
-  const def = hqTableDefs[key];
-  const row = {};
-  def.cols.forEach(c=>{ row[c.key] = document.getElementById('hqf_'+c.key).value.trim(); });
-  if(idx!==null && idx!==undefined){ state.hq[key][idx] = row; } else { state.hq[key].unshift(row); }
-  saveAll(); closeModal(); toast('Saved'); renderHqSection(key);
+function onHqColTypeChange(){
+  document.getElementById('col_options_wrap').style.display = document.getElementById('col_type').value==='select' ? '' : 'none';
 }
-function deleteHqRow(key, idx, fromModal){
-  if(!confirm('Delete this entry?')) return;
-  state.hq[key].splice(idx,1);
-  saveAll();
-  if(fromModal) closeModal();
-  renderHqSection(key);
+function saveHqColumn(blockId){
+  const b = state.hqBlocks.find(x=>x.id===blockId); if(!b) return;
+  const name = document.getElementById('col_name').value.trim();
+  if(!name){ toast('Column name required'); return; }
+  const type = document.getElementById('col_type').value;
+  const key = 'c_'+uid();
+  const col = { key, label:name, type };
+  if(type==='select'){ col.options = document.getElementById('col_options').value.split(',').map(s=>s.trim()).filter(Boolean); }
+  b.columns.push(col);
+  b.rows.forEach(r=>{ r[key] = type==='number' ? 0 : ''; });
+  saveAll(); closeModal(); toast('Column added'); renderHqBlocks();
+}
+function openAddHqBlockModal(){
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Add Block</h3>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <button class="btn secondary" style="justify-content:flex-start;" onclick="addHqBlock('table')">📊 Table — structured rows &amp; columns</button>
+      <button class="btn secondary" style="justify-content:flex-start;" onclick="addHqBlock('text')">📝 Text Note — free-form notes</button>
+      <button class="btn secondary" style="justify-content:flex-start;" onclick="addHqBlock('divider')">➖ Divider — section header</button>
+    </div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button></div>`;
+  openModal();
+}
+function addHqBlock(type){
+  closeModal();
+  const title = prompt('Block title:') || (type==='divider'?'Section':'Untitled');
+  let block;
+  if(type==='table'){ block = { id:uid(), type:'table', size:'half', title, columns:[{key:'col1',label:'Item',type:'text'}], rows:[] }; }
+  else if(type==='text'){ block = { id:uid(), type:'text', size:'half', title, content:'' }; }
+  else { block = { id:uid(), type:'divider', size:'full', title }; }
+  state.hqBlocks.push(block);
+  saveAll(); renderHqBlocks(); toast('Block added');
+}
+function toggleHqBlockSize(id){
+  const b = state.hqBlocks.find(x=>x.id===id); if(!b) return;
+  b.size = b.size==='full' ? 'half' : 'full';
+  saveAll(); renderHqBlocks();
+}
+function renameHqBlock(id, title){
+  const b = state.hqBlocks.find(x=>x.id===id); if(!b) return;
+  b.title = title.trim() || b.title; saveAll();
+}
+function deleteHqBlock(id){
+  if(!confirm('Delete this block? This cannot be undone.')) return;
+  state.hqBlocks = state.hqBlocks.filter(b=>b.id!==id);
+  saveAll(); renderHqBlocks();
+}
+let hqBlocksSortable = null;
+function initHqBlocksSortable(){
+  const el = document.getElementById('hqBlocksContainer');
+  if(hqBlocksSortable) hqBlocksSortable.destroy();
+  hqBlocksSortable = Sortable.create(el, {
+    handle: '.hq-block-drag', animation:150, ghostClass:'sortable-ghost',
+    onEnd: function(){
+      const ids = [...el.children].map(c=>c.dataset.blockId);
+      state.hqBlocks.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
+      saveAll();
+    }
+  });
+}
+function renderHqBlockHtml(b){
+  const sizeClass = b.size==='full' ? 'hq-block-full' : '';
+  const dividerClass = b.type==='divider' ? 'hq-block-divider' : '';
+  let bodyHtml = '';
+  if(b.type==='mission') bodyHtml = renderMissionBlockBody(b);
+  else if(b.type==='text') bodyHtml = renderTextBlockBody(b);
+  else if(b.type==='table') bodyHtml = renderTableBlockBody(b);
+  const extraActions = b.type==='table' ? `<button class="icon-btn" onclick="openHqColumnModal('${b.id}')" title="Add column">➕📊</button>` : '';
+  return `<div class="hq-block ${sizeClass} ${dividerClass}" data-block-id="${b.id}">
+    <div class="hq-block-header">
+      <span class="hq-block-drag">⠿</span>
+      <input class="hq-block-title" style="background:transparent; border:none; padding:2px 4px;" value="${escapeHtml(b.title)}" onchange="renameHqBlock('${b.id}', this.value)">
+      <div class="hq-block-actions">
+        ${extraActions}
+        ${b.type!=='divider' ? `<button class="icon-btn" onclick="toggleHqBlockSize('${b.id}')" title="Resize">${b.size==='full'?'↔️':'⛶'}</button>` : ''}
+        <button class="icon-btn" onclick="deleteHqBlock('${b.id}')" title="Delete block">🗑️</button>
+      </div>
+    </div>
+    ${b.type!=='divider' ? `<div class="hq-block-body">${bodyHtml}</div>` : ''}
+  </div>`;
+}
+function renderHqBlocks(){
+  const container = document.getElementById('hqBlocksContainer');
+  if(!container) return;
+  container.innerHTML = state.hqBlocks.map(renderHqBlockHtml).join('');
+  initHqBlocksSortable();
 }
 
 /* ===================== REPORTS ===================== */
@@ -1835,46 +1983,56 @@ function deleteTask(id, fromModal){
   renderTasks();
 }
 
-/* Team roster — lightweight, used for assignment + notification matching */
-function openTeamModal(){
-  document.getElementById('modalBody').innerHTML = `
-    <h3>👥 Team Members</h3>
-    <div class="flag-hint" style="margin-bottom:12px;">Add each teammate's email exactly as their login — that's how they get notified when assigned a task.</div>
-    <div id="teamList" style="margin-bottom:14px;"></div>
-    <div class="field-row">
-      <input id="tm_name" placeholder="Name">
-      <input id="tm_email" placeholder="Email (optional)">
-    </div>
-    <button class="btn small secondary" style="width:100%; justify-content:center; margin-top:8px;" onclick="addTeamMember()">+ Add Member</button>
-    <div class="modal-actions"><button class="btn" onclick="closeModal()">Done</button></div>`;
-  renderTeamList();
-  openModal();
-}
+/* Team directory — auto-populated from real logins, so it always matches your Supabase Auth users */
 const avatarColors = ['#e8963c','#6bab6a','#d1596b','#5b8cd6','#d4af5a','#a86bd1'];
-function renderTeamList(){
-  const wrap = document.getElementById('teamList');
-  if(!wrap) return;
-  wrap.innerHTML = state.teamMembers.map(m=>`
-    <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);">
-      <span class="task-avatar" style="background:${m.color};">${initials(m.name)}</span>
-      <div style="flex:1;"><div style="font-size:13px; font-weight:600;">${escapeHtml(m.name)}</div><div style="font-size:11px; color:var(--text-muted);">${escapeHtml(m.email||'no email set')}</div></div>
-      <button class="icon-btn" onclick="removeTeamMember('${m.id}')">🗑️</button>
-    </div>`).join('');
+function ensureCurrentUserInTeam(){
+  if(!currentUser || !currentUser.email) return;
+  const email = currentUser.email.toLowerCase();
+  let member = state.teamMembers.find(m=>(m.email||'').toLowerCase()===email);
+  if(!member){
+    const color = avatarColors[state.teamMembers.length % avatarColors.length];
+    const name = (currentUser.user_metadata && currentUser.user_metadata.name) ? currentUser.user_metadata.name : currentUser.email.split('@')[0];
+    member = { id: currentUser.id, name, email: currentUser.email, color, joinedAt: new Date().toISOString() };
+    state.teamMembers.push(member);
+    saveAll();
+  }
 }
-function addTeamMember(){
-  const name = document.getElementById('tm_name').value.trim();
-  const email = document.getElementById('tm_email').value.trim();
-  if(!name){ toast('Enter a name'); return; }
-  const color = avatarColors[state.teamMembers.length % avatarColors.length];
-  state.teamMembers.push({ id: uid(), name, email, color });
-  saveAll(); document.getElementById('tm_name').value=''; document.getElementById('tm_email').value='';
-  renderTeamList(); toast('Added');
+function openTeamModal(){
+  document.querySelector('.nav-item[data-page="team"]').click();
+}
+function renderTeamPage(){
+  const body = document.getElementById('teamPageBody');
+  if(!body) return;
+  if(!state.teamMembers.length){ body.innerHTML = `<div class="card" style="text-align:center; color:var(--text-muted); padding:30px;">No one has logged in yet — team members appear here automatically the first time they sign in.</div>`; return; }
+  body.innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${state.teamMembers.map(m=>`
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        <span class="task-avatar" style="width:36px; height:36px; font-size:13px; background:${m.color}; cursor:pointer;" onclick="cycleTeamColor('${m.id}')" title="Tap to change color">${initials(m.name)}</span>
+        <div style="flex:1;">
+          <input value="${escapeHtml(m.name)}" style="font-weight:600; padding:4px 6px; font-size:13px;" onchange="renameTeamMember('${m.id}', this.value)">
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${escapeHtml(m.email||'—')}</div>
+        </div>
+      </div>
+      <div class="flag-hint" style="margin-bottom:8px;">Joined ${m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</div>
+      <button class="btn danger small" style="width:100%; justify-content:center;" onclick="removeTeamMember('${m.id}')">Remove from team</button>
+    </div>`).join('')}</div>`;
+}
+function renameTeamMember(id, name){
+  const m = state.teamMembers.find(x=>x.id===id); if(!m) return;
+  m.name = name.trim() || m.name;
+  saveAll(); renderTeamPage(); renderTasks();
+}
+function cycleTeamColor(id){
+  const m = state.teamMembers.find(x=>x.id===id); if(!m) return;
+  const idx = (avatarColors.indexOf(m.color)+1) % avatarColors.length;
+  m.color = avatarColors[idx];
+  saveAll(); renderTeamPage(); renderTasks();
 }
 function removeTeamMember(id){
-  if(!confirm('Remove this team member? Their assigned tasks will become unassigned.')) return;
+  if(!confirm('Remove this person from the team directory? This does not delete their login — they can still sign in and will be re-added automatically. Their assigned tasks will become unassigned.')) return;
   state.teamMembers = state.teamMembers.filter(m=>m.id!==id);
   state.tasks.forEach(t=>{ if(t.assigneeId===id) t.assigneeId=null; });
-  saveAll(); renderTeamList(); renderTasks();
+  saveAll(); renderTeamPage(); renderTasks();
 }
 
 /* Browser notifications for new assignments */
