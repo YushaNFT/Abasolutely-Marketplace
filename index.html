@@ -139,20 +139,31 @@
   .nav-badge{ background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-left:auto; }
 
   /* HQ BLOCKS (Notion-style) */
-  #hqBlocksContainer{ display:grid; grid-template-columns:repeat(2,1fr); gap:16px; align-items:start; }
+  #hqBlocksContainer{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; align-items:start; }
   @media(max-width:900px){ #hqBlocksContainer{ grid-template-columns:1fr; } }
-  .hq-block{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .hq-block{ background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:visible; transition:border-color .15s; }
+  .hq-block:hover{ border-color:var(--amber-dim); }
   .hq-block-full{ grid-column:1/-1; }
-  .hq-block-divider{ background:transparent; border:none; }
-  .hq-block-header{ display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--border); }
-  .hq-block-divider .hq-block-header{ border-bottom:none; padding:18px 4px 6px; }
+  .hq-block-divider, .hq-block-heading{ background:transparent; border-color:transparent; }
+  .hq-block-header{ display:flex; align-items:center; gap:6px; padding:10px 14px; border-bottom:1px solid var(--border); }
+  .hq-block-divider .hq-block-header, .hq-block-heading .hq-block-header{ border-bottom:none; padding:14px 4px 4px; }
   .hq-block-drag{ cursor:grab; color:var(--text-muted); font-size:14px; user-select:none; }
-  .hq-block-title{ flex:1; font-size:14px; font-weight:600; }
-  .hq-block-divider .hq-block-title{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--amber); border-bottom:1px solid var(--border); padding-bottom:8px; }
-  .hq-block-actions{ display:flex; gap:2px; flex-shrink:0; }
-  .hq-block-body{ padding:14px 16px; }
+  .hq-block-title{ flex:1; font-size:13px; font-weight:600; }
+  .hq-block-divider .hq-block-title{ font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--amber); border-bottom:1px solid var(--border); padding-bottom:8px; font-weight:600; }
+  .hq-block-heading .hq-block-title{ font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--text); }
+  .hq-block-actions{ display:flex; gap:0; flex-shrink:0; }
+  .hq-block-body{ padding:12px 14px 14px; }
   .hq-block.sortable-ghost{ opacity:.3; }
   .hq-mission-field label{ margin-bottom:4px; }
+  .hq-list-row{ display:flex; align-items:center; gap:8px; padding:3px 0; }
+  .hq-list-row input[type=text], .hq-list-row input:not([type]){ flex:1; background:transparent; border:none; padding:3px 4px; font-size:13px; }
+  .hq-list-row .icon-btn{ opacity:.4; }
+  .hq-list-row:hover .icon-btn{ opacity:1; }
+  @media (hover: hover){
+    .hq-block-drag, .hq-block-actions{ opacity:0; transition:opacity .15s; }
+    .hq-block:hover .hq-block-drag, .hq-block:hover .hq-block-actions{ opacity:1; }
+  }
+
 
   @media print{
     body *{ visibility:hidden; }
@@ -1700,23 +1711,42 @@ function saveHqColumn(blockId){
   b.rows.forEach(r=>{ r[key] = type==='number' ? 0 : ''; });
   saveAll(); closeModal(); toast('Column added'); renderHqBlocks();
 }
+const hqBlockTypeOptions = [
+  {type:'heading', icon:'🔠', label:'Heading', desc:'Big section title'},
+  {type:'text', icon:'📝', label:'Text', desc:'Free-form paragraph'},
+  {type:'checklist', icon:'✅', label:'Checklist', desc:'To-dos you can check off'},
+  {type:'list', icon:'•', label:'Bulleted List', desc:'Simple list'},
+  {type:'numberlist', icon:'🔢', label:'Numbered List', desc:'Ordered steps'},
+  {type:'callout', icon:'💡', label:'Callout', desc:'Highlighted reminder'},
+  {type:'quote', icon:'❝', label:'Quote', desc:'Styled quote'},
+  {type:'table', icon:'📊', label:'Table', desc:'Rows & columns, your own fields'},
+  {type:'divider', icon:'➖', label:'Divider', desc:'Section break'},
+];
 function openAddHqBlockModal(){
   document.getElementById('modalBody').innerHTML = `
     <h3>Add Block</h3>
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      <button class="btn secondary" style="justify-content:flex-start;" onclick="addHqBlock('table')">📊 Table — structured rows &amp; columns</button>
-      <button class="btn secondary" style="justify-content:flex-start;" onclick="addHqBlock('text')">📝 Text Note — free-form notes</button>
-      <button class="btn secondary" style="justify-content:flex-start;" onclick="addHqBlock('divider')">➖ Divider — section header</button>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      ${hqBlockTypeOptions.map(o=>`<button class="btn secondary" style="flex-direction:column; align-items:flex-start; height:auto; padding:12px; gap:2px;" onclick="addHqBlock('${o.type}')">
+        <div style="font-size:17px;">${o.icon}</div>
+        <div style="font-weight:600; font-size:12.5px;">${o.label}</div>
+        <div style="font-size:10.5px; color:var(--text-muted); font-weight:400; line-height:1.3;">${o.desc}</div>
+      </button>`).join('')}
     </div>
     <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button></div>`;
   openModal();
 }
 function addHqBlock(type){
   closeModal();
-  const title = prompt('Block title:') || (type==='divider'?'Section':'Untitled');
+  const title = (type==='divider'||type==='heading') ? (prompt('Label:')||'Section') : (prompt('Block title:')||'Untitled');
   let block;
   if(type==='table'){ block = { id:uid(), type:'table', size:'half', title, columns:[{key:'col1',label:'Item',type:'text'}], rows:[] }; }
   else if(type==='text'){ block = { id:uid(), type:'text', size:'half', title, content:'' }; }
+  else if(type==='checklist'){ block = { id:uid(), type:'checklist', size:'half', title, items:[] }; }
+  else if(type==='list'){ block = { id:uid(), type:'list', size:'half', title, ordered:false, items:[] }; }
+  else if(type==='numberlist'){ block = { id:uid(), type:'list', size:'half', title, ordered:true, items:[] }; }
+  else if(type==='callout'){ block = { id:uid(), type:'callout', size:'half', title, icon:'💡', color:'amber', text:'' }; }
+  else if(type==='quote'){ block = { id:uid(), type:'quote', size:'half', title, text:'' }; }
+  else if(type==='heading'){ block = { id:uid(), type:'heading', size:'full', title }; }
   else { block = { id:uid(), type:'divider', size:'full', title }; }
   state.hqBlocks.push(block);
   saveAll(); renderHqBlocks(); toast('Block added');
@@ -1748,25 +1778,89 @@ function initHqBlocksSortable(){
     }
   });
 }
+/* Lists (bulleted/numbered) */
+function renderListBlockBody(b){
+  const marker = i => b.ordered ? (i+1)+'.' : '•';
+  const rows = b.items.map((it,i)=>`
+    <div class="hq-list-row">
+      <span style="color:var(--text-muted); flex-shrink:0; width:18px;">${marker(i)}</span>
+      <input value="${escapeHtml(it)}" oninput="updateHqListItem('${b.id}',${i},this.value)">
+      <button class="icon-btn" onclick="removeHqListItem('${b.id}',${i})">✕</button>
+    </div>`).join('');
+  return `${rows}
+    <div class="hq-list-row">
+      <span style="color:var(--text-muted); flex-shrink:0; width:18px;">${marker(b.items.length)}</span>
+      <input placeholder="Add item, press Enter" onkeydown="if(event.key==='Enter'){addHqListItem('${b.id}', this.value); this.value='';}">
+    </div>`;
+}
+function updateHqListItem(id,i,val){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.items[i]=val; saveAll(); }
+function addHqListItem(id,val){ if(!val.trim())return; const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.items.push(val.trim()); saveAll(); renderHqBlocks(); }
+function removeHqListItem(id,i){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.items.splice(i,1); saveAll(); renderHqBlocks(); }
+/* Checklist */
+function renderChecklistBlockBody(b){
+  const rows = b.items.map((it,i)=>`
+    <div class="hq-list-row">
+      <input type="checkbox" ${it.checked?'checked':''} style="width:auto;" onchange="toggleHqChecklistItem('${b.id}',${i})">
+      <input value="${escapeHtml(it.text)}" style="${it.checked?'text-decoration:line-through; color:var(--text-muted);':''}" oninput="updateHqChecklistText('${b.id}',${i},this.value)">
+      <button class="icon-btn" onclick="removeHqChecklistItem('${b.id}',${i})">✕</button>
+    </div>`).join('');
+  return `${rows}
+    <div class="hq-list-row">
+      <input type="checkbox" disabled style="width:auto; opacity:.3;">
+      <input placeholder="Add task, press Enter" onkeydown="if(event.key==='Enter'){addHqChecklistItem('${b.id}', this.value); this.value='';}">
+    </div>`;
+}
+function toggleHqChecklistItem(id,i){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.items[i].checked=!b.items[i].checked; saveAll(); renderHqBlocks(); }
+function updateHqChecklistText(id,i,val){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.items[i].text=val; saveAll(); }
+function addHqChecklistItem(id,val){ if(!val.trim())return; const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.items.push({text:val.trim(),checked:false}); saveAll(); renderHqBlocks(); }
+function removeHqChecklistItem(id,i){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.items.splice(i,1); saveAll(); renderHqBlocks(); }
+/* Callout */
+const calloutIcons = ['💡','⚠️','📌','🔥','✅','❗'];
+const calloutColors = ['amber','green','red'];
+function calloutBg(color){ return { amber:'var(--amber-dim)', green:'var(--green-dim)', red:'var(--red-dim)' }[color] || 'var(--surface-2)'; }
+function renderCalloutBlockBody(b){
+  return `<div style="display:flex; gap:10px; align-items:flex-start; background:${calloutBg(b.color)}; border-radius:8px; padding:12px 14px;">
+    <span style="font-size:18px; cursor:pointer;" onclick="cycleCalloutIcon('${b.id}')" title="Tap to change icon">${b.icon||'💡'}</span>
+    <textarea rows="2" style="flex:1; background:transparent; border:none; padding:2px;" oninput="updateHqCalloutText('${b.id}',this.value)" placeholder="Write your reminder...">${escapeHtml(b.text||'')}</textarea>
+  </div>`;
+}
+function updateHqCalloutText(id,val){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.text=val; saveAll(); }
+function cycleCalloutIcon(id){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; const idx=(calloutIcons.indexOf(b.icon)+1)%calloutIcons.length; b.icon=calloutIcons[idx]; saveAll(); renderHqBlocks(); }
+function cycleCalloutColor(id){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; const idx=(calloutColors.indexOf(b.color)+1)%calloutColors.length; b.color=calloutColors[idx]; saveAll(); renderHqBlocks(); }
+/* Quote */
+function renderQuoteBlockBody(b){
+  return `<div style="border-left:3px solid var(--amber); padding-left:12px;">
+    <textarea rows="2" style="width:100%; background:transparent; border:none; font-style:italic; color:var(--text-muted); padding:2px;" oninput="updateHqQuoteText('${b.id}',this.value)" placeholder="A quote, a principle, a reminder...">${escapeHtml(b.text||'')}</textarea>
+  </div>`;
+}
+function updateHqQuoteText(id,val){ const b=state.hqBlocks.find(x=>x.id===id); if(!b)return; b.text=val; saveAll(); }
 function renderHqBlockHtml(b){
   const sizeClass = b.size==='full' ? 'hq-block-full' : '';
-  const dividerClass = b.type==='divider' ? 'hq-block-divider' : '';
+  const chromeClass = (b.type==='divider'||b.type==='heading') ? 'hq-block-'+b.type : '';
   let bodyHtml = '';
   if(b.type==='mission') bodyHtml = renderMissionBlockBody(b);
   else if(b.type==='text') bodyHtml = renderTextBlockBody(b);
   else if(b.type==='table') bodyHtml = renderTableBlockBody(b);
-  const extraActions = b.type==='table' ? `<button class="icon-btn" onclick="openHqColumnModal('${b.id}')" title="Add column">➕📊</button>` : '';
-  return `<div class="hq-block ${sizeClass} ${dividerClass}" data-block-id="${b.id}">
+  else if(b.type==='list') bodyHtml = renderListBlockBody(b);
+  else if(b.type==='checklist') bodyHtml = renderChecklistBlockBody(b);
+  else if(b.type==='callout') bodyHtml = renderCalloutBlockBody(b);
+  else if(b.type==='quote') bodyHtml = renderQuoteBlockBody(b);
+  let extraActions = '';
+  if(b.type==='table') extraActions = `<button class="icon-btn" onclick="openHqColumnModal('${b.id}')" title="Add column">➕📊</button>`;
+  if(b.type==='callout') extraActions = `<button class="icon-btn" onclick="cycleCalloutColor('${b.id}')" title="Change color">🎨</button>`;
+  const noBody = b.type==='divider' || b.type==='heading';
+  const canResize = !noBody;
+  return `<div class="hq-block ${sizeClass} ${chromeClass}" data-block-id="${b.id}">
     <div class="hq-block-header">
       <span class="hq-block-drag">⠿</span>
       <input class="hq-block-title" style="background:transparent; border:none; padding:2px 4px;" value="${escapeHtml(b.title)}" onchange="renameHqBlock('${b.id}', this.value)">
       <div class="hq-block-actions">
         ${extraActions}
-        ${b.type!=='divider' ? `<button class="icon-btn" onclick="toggleHqBlockSize('${b.id}')" title="Resize">${b.size==='full'?'↔️':'⛶'}</button>` : ''}
+        ${canResize ? `<button class="icon-btn" onclick="toggleHqBlockSize('${b.id}')" title="Resize">${b.size==='full'?'↔️':'⛶'}</button>` : ''}
         <button class="icon-btn" onclick="deleteHqBlock('${b.id}')" title="Delete block">🗑️</button>
       </div>
     </div>
-    ${b.type!=='divider' ? `<div class="hq-block-body">${bodyHtml}</div>` : ''}
+    ${!noBody ? `<div class="hq-block-body">${bodyHtml}</div>` : ''}
   </div>`;
 }
 function renderHqBlocks(){
