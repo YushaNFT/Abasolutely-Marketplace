@@ -225,6 +225,7 @@
       <div class="nav-item" data-page="pnBookings"><span class="nav-icon">📅</span> Bookings</div>
       <div class="nav-item" data-page="pnJobOrders"><span class="nav-icon">📋</span> Job Order</div>
       <div class="nav-item" data-page="pnInventory"><span class="nav-icon">🪑</span> Inventory</div>
+      <div class="nav-item" data-page="pnRentals"><span class="nav-icon">🎤</span> Rentals</div>
       <div class="nav-divider">Settings</div>
       <div class="nav-item" data-page="team"><span class="nav-icon">👥</span> Team</div>
       <div class="nav-item" data-page="bir"><span class="nav-icon">🏛️</span> BIR Calculator</div>
@@ -724,6 +725,20 @@
       </div>
     </div>
 
+    <!-- PARTY NEEDS RENTALS -->
+    <div class="page" id="page-pnRentals">
+      <div class="page-head">
+        <div><h1>🎤 Rentals</h1><div class="sub">Karaoke, furniture bundles &amp; DIY souvenir booth packages — feeds Event Quotation same as Inventory</div></div>
+        <button class="btn" onclick="openPnRentalModal()">+ Add Rental/Package</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Category</th><th>Name</th><th>PAX</th><th>Price</th><th>Unit</th><th>Inclusions</th><th></th></tr></thead>
+          <tbody id="pnRentalsBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
     <!-- MANAGE PRODUCTS (the printing services database) -->
     <div class="page" id="page-manageproducts">
       <div class="page-head">
@@ -938,7 +953,7 @@
                   <option value="4x6">4R (4×6 in)</option>
                   <option value="5x7">5R (5×7 in)</option>
                   <option value="8.5x11">Letter (8.5×11 in)</option>
-                  <option value="8.27x11.69">A4 (8.27×11.69 in)</option>
+                  <option value="8.27x11.69" selected>A4 (8.27×11.69 in)</option>
                 </select>
               </div>
               <div class="field"><label>Margin (in)</label><input type="number" step="0.02" id="ridMargin" value="0.12" oninput="onRidSpacingChange()"></div>
@@ -1160,6 +1175,7 @@ let state = {
   hqBlocks: storageGet('am_hq_blocks', null),
   partyBookings: storageGet('am_party_bookings', []),
   partyColors: storageGet('am_party_colors', null),
+  pnRentals: storageGet('am_pn_rentals', null),
   tasks: storageGet('am_tasks', []),
   teamMembers: storageGet('am_team_members', null),
   partyInventory: storageGet('am_party_inventory', null),
@@ -1364,6 +1380,15 @@ if(state.partyInventory === null){
 if(state.partyColors === null){
   state.partyColors = ['White','Black','Red','Blue','Gold'];
 }
+if(state.pnRentals === null){
+  state.pnRentals = [
+    { id: uid(), category:'Karaoke', name:'Traditional Karaoke Rental', pax:null, price:0, unit:'per event', inclusions:'Karaoke machine + 2 mics + speaker', notes:'Set your real rate — not yet priced' },
+    { id: uid(), category:'Karaoke', name:'Modern Karaoke Rental', pax:null, price:0, unit:'per event', inclusions:'Smart karaoke system + wireless mics + TV/monitor', notes:'Set your real rate — not yet priced' },
+    { id: uid(), category:'Furniture', name:'Chairs & Tables', pax:null, price:0, unit:'per set', inclusions:'Bundle reference — per-piece rates live in Party Needs Inventory', notes:'Use Inventory for actual chair/table pricing' },
+    { id: uid(), category:'DIY Booth', name:'DIY Souvenir Booth — Package #1', pax:20, price:5200, unit:'package (20 pax)', inclusions:'Choice of 1 item (Tote Bag / Small Pouch / String Bag) + 1 DTF design, staffed booth setup', notes:'Estimated ₱260/pax — cost-based estimate, not scraped competitor pricing. Verify against your real material costs.' },
+    { id: uid(), category:'DIY Booth', name:'DIY Souvenir Booth — Package #2', pax:30, price:9600, unit:'package (30 pax)', inclusions:'Choice of item + upgraded 2-color DTF design, staffed booth setup', notes:'Estimated ₱320/pax — cost-based estimate, not scraped competitor pricing. Verify against your real material costs.' },
+  ];
+}
 if(state.teamMembers === null){
   state.teamMembers = [];
 }
@@ -1387,6 +1412,7 @@ function persistLocalOnly(){
   storageSet('am_hq_blocks', state.hqBlocks);
   storageSet('am_party_bookings', state.partyBookings);
   storageSet('am_party_colors', state.partyColors);
+  storageSet('am_pn_rentals', state.pnRentals);
   storageSet('am_tasks', state.tasks);
   storageSet('am_team_members', state.teamMembers);
   storageSet('am_party_inventory', state.partyInventory);
@@ -1569,6 +1595,7 @@ function renderEverything(){
   renderBookingsPage();
   renderPnJobsList();
   renderPnInventory();
+  renderPnRentals();
   renderPartyColorsList();
   renderReportBody(reportActiveTab);
   renderTasks();
@@ -3148,6 +3175,61 @@ function savePnInventory(id){
 }
 function deletePnInventory(id){ if(!confirm('Delete this item?')) return; state.partyInventory = state.partyInventory.filter(p=>p.id!==id); saveAll(); renderPnInventory(); }
 
+/* PARTY NEEDS RENTALS (Karaoke, Furniture bundles, DIY Booth packages) */
+function renderPnRentals(){
+  const body = document.getElementById('pnRentalsBody');
+  if(!body) return;
+  if(!state.pnRentals.length){ body.innerHTML = `<tr class="empty-row"><td colspan="7">No rentals yet — add your first one.</td></tr>`; return; }
+  body.innerHTML = state.pnRentals.map(r=>`<tr>
+    <td><span class="badge gray">${escapeHtml(r.category)}</span></td>
+    <td>${escapeHtml(r.name)}</td>
+    <td>${r.pax?r.pax+' pax':'—'}</td>
+    <td>${r.price?peso(r.price):'<span class="badge orange">Not set</span>'}</td>
+    <td>${escapeHtml(r.unit||'—')}</td>
+    <td style="max-width:260px; font-size:12px; color:var(--text-muted);">${escapeHtml(r.inclusions||'—')}</td>
+    <td><button class="icon-btn" onclick="openPnRentalModal('${r.id}')">✏️</button><button class="icon-btn" onclick="deletePnRental('${r.id}')">🗑️</button></td>
+  </tr>`).join('');
+}
+function openPnRentalModal(id){
+  const r = id ? state.pnRentals.find(x=>x.id===id) : null;
+  const categories = [...new Set(state.pnRentals.map(x=>x.category))];
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${r?'Edit':'Add'} Rental / Package</h3>
+    <div class="field"><label>Category</label><input id="pr_category" list="pr_categoryList" value="${r?escapeHtml(r.category):''}" placeholder="e.g. Karaoke, DIY Booth"></div>
+    <datalist id="pr_categoryList">${categories.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <div class="field"><label>Name</label><input id="pr_name" value="${r?escapeHtml(r.name):''}" placeholder="e.g. DIY Souvenir Booth — Package #1"></div>
+    <div class="field-row">
+      <div class="field"><label>PAX (optional)</label><input id="pr_pax" type="number" value="${r&&r.pax?r.pax:''}"></div>
+      <div class="field"><label>Price (₱)</label><input id="pr_price" type="number" value="${r?r.price:''}"></div>
+    </div>
+    <div class="field"><label>Unit</label><input id="pr_unit" value="${r?escapeHtml(r.unit||''):''}" placeholder="e.g. per event, package (20 pax), per set"></div>
+    <div class="field"><label>Inclusions</label><textarea id="pr_inclusions" rows="2">${r?escapeHtml(r.inclusions||''):''}</textarea></div>
+    <div class="field"><label>Notes</label><input id="pr_notes" value="${r?escapeHtml(r.notes||''):''}"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="savePnRental(${r?`'${r.id}'`:'null'})">Save</button></div>`;
+  openModal();
+}
+function savePnRental(id){
+  const name = document.getElementById('pr_name').value.trim();
+  const category = document.getElementById('pr_category').value.trim();
+  if(!name || !category){ toast('Category and name are required'); return; }
+  const payload = {
+    category, name,
+    pax: Number(document.getElementById('pr_pax').value)||null,
+    price: Number(document.getElementById('pr_price').value)||0,
+    unit: document.getElementById('pr_unit').value.trim(),
+    inclusions: document.getElementById('pr_inclusions').value.trim(),
+    notes: document.getElementById('pr_notes').value.trim(),
+  };
+  if(id){ const r = state.pnRentals.find(x=>x.id===id); Object.assign(r, payload); }
+  else { state.pnRentals.push({ id: uid(), ...payload }); }
+  saveAll(); closeModal(); toast('Saved'); renderPnRentals();
+}
+function deletePnRental(id){
+  if(!confirm('Delete this rental/package?')) return;
+  state.pnRentals = state.pnRentals.filter(r=>r.id!==id);
+  saveAll(); renderPnRentals();
+}
+
 /* Specs / Colors — feeds the Event Quotation specs dropdown */
 function renderPartyColorsList(){
   const wrap = document.getElementById('partyColorsList');
@@ -3626,7 +3708,7 @@ function deleteCosting(id){ state.costings = state.costings.filter(c=>c.id!==id)
 
 /* ===================== RUSH ID (mixed-size packages) ===================== */
 let ridPhoto = null;
-let ridPaperKey = '4x6';
+let ridPaperKey = '8.27x11.69';
 let ridMargin = 0.12;
 let ridGap = 0.05;
 let ridGroups = [{count:6, w:2, h:2}];
