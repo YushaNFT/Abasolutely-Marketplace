@@ -6,11 +6,13 @@
 <title>Abasolutely Marketplace — Operations Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --bg: #14140f; --surface: #1c1c15; --surface-2: #24241b; --border: #34342a;
@@ -138,15 +140,32 @@
   .task-avatar{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#1c1305; flex-shrink:0; }
   .nav-badge{ background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-left:auto; }
 
+  /* RESEARCH (competitor radius map) */
+  @keyframes pulseRing{0%{transform:scale(.4);opacity:.7;}100%{transform:scale(1.8);opacity:0;}}
+  #researchMap{ height:460px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:8px; background:var(--surface); }
+  .leaflet-container{ background:var(--surface); font-family:'Inter',sans-serif; }
+  .leaflet-popup-content-wrapper{ background:var(--surface-2); color:var(--text); border-radius:8px; }
+  .leaflet-popup-tip{ background:var(--surface-2); }
+  .research-pop-title{ font-weight:600; font-size:13px; margin:0 0 4px; }
+  .research-pop-cat{ display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; padding:2px 8px; border-radius:999px; margin-bottom:6px; }
+  .research-pop-row{ font-size:12px; color:var(--text-muted); margin:2px 0; }
+  .research-pop-row b{ color:var(--text); font-weight:500; }
+  .research-controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+  .research-basemap-toggle{ display:flex; border:1px solid var(--border); border-radius:999px; overflow:hidden; }
+  .research-basemap-toggle button{ font-size:12px; font-weight:500; background:var(--surface); color:var(--text-muted); border:none; padding:7px 13px; cursor:pointer; }
+  .research-basemap-toggle button.active{ background:var(--amber-dim); color:var(--amber); }
+  .research-idx-track{ width:56px; height:6px; background:var(--border); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:6px; }
+  .research-idx-fill{ height:100%; }
+
+
   /* HQ BLOCKS (Notion-style) */
-  #hqBlocksContainer{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; align-items:start; }
-  @media(max-width:900px){ #hqBlocksContainer{ grid-template-columns:1fr; } }
-  .hq-block{ background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:visible; transition:border-color .15s; }
+  #hqBlocksContainer{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; }
+  .hq-block{ background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:auto; transition:border-color .15s; resize:both; min-width:240px; min-height:90px; max-width:100%; flex:0 0 auto; width:calc(50% - 5px); }
   .hq-block:hover{ border-color:var(--amber-dim); }
-  .hq-block-full{ grid-column:1/-1; }
-  .hq-block-divider, .hq-block-heading{ background:transparent; border-color:transparent; }
-  .hq-block-header{ display:flex; align-items:center; gap:6px; padding:10px 14px; border-bottom:1px solid var(--border); }
-  .hq-block-divider .hq-block-header, .hq-block-heading .hq-block-header{ border-bottom:none; padding:14px 4px 4px; }
+  .hq-block-full{ width:100%; }
+  .hq-block-divider, .hq-block-heading{ background:transparent; border-color:transparent; resize:none; min-height:auto; overflow:visible; }
+  .hq-block-header{ display:flex; align-items:center; gap:6px; padding:10px 14px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); z-index:1; }
+  .hq-block-divider .hq-block-header, .hq-block-heading .hq-block-header{ border-bottom:none; padding:14px 4px 4px; position:static; }
   .hq-block-drag{ cursor:grab; color:var(--text-muted); font-size:14px; user-select:none; }
   .hq-block-title{ flex:1; font-size:13px; font-weight:600; }
   .hq-block-divider .hq-block-title{ font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--amber); border-bottom:1px solid var(--border); padding-bottom:8px; font-weight:600; }
@@ -163,6 +182,12 @@
     .hq-block-drag, .hq-block-actions{ opacity:0; transition:opacity .15s; }
     .hq-block:hover .hq-block-drag, .hq-block:hover .hq-block-actions{ opacity:1; }
   }
+  @media(max-width:700px){ .hq-block{ width:100% !important; resize:vertical; } }
+  /* spreadsheet-style resizable table columns inside HQ table blocks */
+  .hq-datatable{ table-layout:fixed; }
+  .hq-datatable th{ position:relative; overflow:hidden; text-overflow:ellipsis; }
+  .hq-col-resize-handle{ position:absolute; right:-3px; top:0; width:7px; height:100%; cursor:col-resize; z-index:2; touch-action:none; }
+  .hq-col-resize-handle:hover, .hq-col-resize-handle.active{ background:var(--amber); opacity:.5; }
 
 
   @media print{
@@ -203,6 +228,7 @@
     <nav>
       <div class="nav-divider" style="padding-top:0;">Main Tab</div>
       <div class="nav-item" data-page="hq"><span class="nav-icon">🏛️</span> HQ</div>
+      <div class="nav-item" data-page="research"><span class="nav-icon">🔎</span> Research</div>
       <div class="nav-item" data-page="tasks"><span class="nav-icon">✅</span> Tasks <span class="nav-badge" id="taskNavBadge" style="display:none;"></span></div>
       <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
       <div class="nav-item" data-page="reports"><span class="nav-icon">📈</span> Reports</div>
@@ -289,6 +315,46 @@
         <button class="btn" onclick="openAddHqBlockModal()">+ Add Block</button>
       </div>
       <div id="hqBlocksContainer"></div>
+    </div>
+
+    <!-- RESEARCH (competitor radius map) -->
+    <div class="page" id="page-research">
+      <div class="page-head">
+        <div><h1>🔎 Research</h1><div class="sub">Competitor radius map — who's around you, how close, and what they offer</div></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" onclick="openResearchRefModal()">⚙ Reference Point</button>
+          <button class="btn" onclick="openResearchCompModal()">+ Add Competitor</button>
+        </div>
+      </div>
+      <div class="research-controls" id="researchFilterBar">
+        <div class="research-basemap-toggle" id="researchBasemapToggle">
+          <button data-mode="sat" class="active">Satellite</button>
+          <button data-mode="street">Street</button>
+        </div>
+        <input id="researchSearch" placeholder="Search competitor name..." style="max-width:220px; margin-left:auto;" oninput="renderResearchAll()">
+      </div>
+      <div id="researchMap"></div>
+      <div class="flag-hint" style="margin-bottom:20px;">Dashed rings mark your set radius bands from the reference point. Marker color = category. Click a marker or table row to focus it. Distance and foot-traffic index are auto-computed from coordinates — nothing to type in by hand.</div>
+
+      <div class="table-head-row" style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+        <h3 style="font-size:16px;">Mapped Competitors</h3>
+        <span class="flag-hint" id="researchCountTag"></span>
+      </div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th style="cursor:pointer;" onclick="setResearchSort('category')">Category</th>
+            <th style="cursor:pointer;" onclick="setResearchSort('name')">Business</th>
+            <th style="cursor:pointer;" onclick="setResearchSort('distance')">Distance</th>
+            <th>Band</th>
+            <th style="cursor:pointer;" onclick="setResearchSort('index')">Foot-Traffic Index</th>
+            <th style="cursor:pointer;" onclick="setResearchSort('threat')">Threat</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="researchTableBody"></tbody>
+        </table></div>
+      </div>
+      <div class="flag-hint" style="margin-top:12px; line-height:1.6;">Distances are straight-line radius distances, not walking/driving distances. The Foot-Traffic Index is a theoretical planning estimate (Huff-style gravity model against your catchment population), not a measured footfall count — use it to compare relative proximity, not as an actual customer count.</div>
     </div>
 
     <!-- DASHBOARD -->
@@ -392,12 +458,12 @@
         <div><h1>Restock Planning</h1><div class="sub">Marking "Bought" adds stock back automatically</div></div>
         <button class="btn" onclick="openRestockModal()">+ Add to Plan</button>
       </div>
-      <div class="card" style="padding:0;">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Product</th><th>Category</th><th>Pcs/Pack</th><th>Cost Price</th><th>Qty Buying</th><th>Total Cost</th><th>Status</th><th></th></tr></thead>
-          <tbody id="restockBody"></tbody>
-        </table></div>
+      <div class="card" style="margin-bottom:16px; display:flex; align-items:center; gap:10px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; text-transform:none; margin:0; cursor:pointer;">
+          <input type="checkbox" id="restockShowHidden" style="width:auto;" onchange="renderRestock()"> Show hidden items too
+        </label>
       </div>
+      <div class="grid" id="restockList" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));"></div>
     </div>
 
     <!-- CUSTOMERS -->
@@ -973,19 +1039,14 @@
     <!-- PRINTING RESTOCK (suppliers for printing materials) -->
     <div class="page" id="page-printrestock">
       <div class="page-head">
-        <div><h1>Printing Restock</h1><div class="sub">Where to buy your printing supplies — with links and locations</div></div>
+        <div><h1>Printing Restock</h1><div class="sub">Where to buy your printing supplies — with pricing, links and locations</div></div>
         <button class="btn" onclick="openSupplyModal()">+ Add Supply</button>
       </div>
       <div class="card" style="margin-bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <input id="psSearch" placeholder="Search supplies..." style="max-width:280px;" oninput="renderPrintSupplies()">
-        <div class="tabbar" id="psTabs" style="margin-bottom:0;">
-          <div class="tab active" data-cat="All">All</div>
-          <div class="tab" data-cat="Packaging Materials">Packaging Materials</div>
-          <div class="tab" data-cat="Papers & Cards">Papers &amp; Cards</div>
-          <div class="tab" data-cat="Tools & Accessories">Tools &amp; Accessories</div>
-        </div>
+        <div class="tabbar" id="psTabs" style="margin-bottom:0;"></div>
       </div>
-      <div class="grid" id="printSuppliesGrid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+      <div class="grid" id="printSuppliesGrid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));"></div>
     </div>
 
     <!-- STICKER GUIDES -->
@@ -1176,6 +1237,7 @@ let state = {
   partyBookings: storageGet('am_party_bookings', []),
   partyColors: storageGet('am_party_colors', null),
   pnRentals: storageGet('am_pn_rentals', null),
+  research: storageGet('am_research', null),
   tasks: storageGet('am_tasks', []),
   teamMembers: storageGet('am_team_members', null),
   partyInventory: storageGet('am_party_inventory', null),
@@ -1389,6 +1451,53 @@ if(state.pnRentals === null){
     { id: uid(), category:'DIY Booth', name:'DIY Souvenir Booth — Package #2', pax:30, price:9600, unit:'package (30 pax)', inclusions:'Choice of item + upgraded 2-color DTF design, staffed booth setup', notes:'Estimated ₱320/pax — cost-based estimate, not scraped competitor pricing. Verify against your real material costs.' },
   ];
 }
+if(state.research === null){
+  state.research = {
+    referencePoint: { label:'ARRA reference point (Pildera II, Pasay City)', plusCode:'G262+JQ Pasay City, Metro Manila', lat:14.510444, lng:121.001722, catchmentPopulation:16621 },
+    radiusBandsM: [250, 500, 1000, 2000, 3000],
+    categories: { print:{label:'Direct Printing',color:'#E5383B'}, party:{label:'Party Needs',color:'#F4A100'}, booth:{label:'Event / Booth',color:'#B26EDB'}, indirect:{label:'Indirect',color:'#4FA3E3'} },
+    competitors: [
+      { id:uid(), name:'Pixel Merchandise', category:'indirect', lat:14.5111745, lng:121.0015122, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Vicky\'s Sari-Sari Store', category:'indirect', lat:14.5113324, lng:121.0024556, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Preamteer Printing Services', category:'print', lat:14.5092992, lng:121.0014082, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Chang\'s Bayad Center and Printing Shop', category:'print', lat:14.5117389, lng:121.0013658, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'YourMAINEShop', category:'print', lat:14.5122375, lng:121.0013329, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Triple J Sari-Sari Store', category:'indirect', lat:14.5088094, lng:121.0002694, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'PRINT THINK SHOP', category:'print', lat:14.5123629, lng:121.0029664, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Inklusive Printing Services', category:'print', lat:14.5085559, lng:121.000354, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Print moto - Baltao', category:'print', lat:14.510655, lng:121.0047025, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Jacqueline Sari Sari Store', category:'indirect', lat:14.5122004, lng:121.004715, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'R & F Rice Retailing and Printing', category:'print', lat:14.515164, lng:121.0015699, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Design of ART Studio and Printing', category:'print', lat:14.515911, lng:121.0028563, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Solis-Andrada Sari-Sari Store', category:'indirect', lat:14.5259503, lng:120.9990339, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Benneth Balloons & Party Needs Sari-Sari Store', category:'party', lat:14.5267648, lng:120.9980136, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Gracie Printing Services', category:'print', lat:14.5250088, lng:121.0163657, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Photopixel Souvenirs and Photobooth', category:'booth', lat:14.5316997, lng:121.0043551, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Kurt Daniel Balloons & Decor', category:'party', lat:14.5334157, lng:121.0011116, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'ERICA\'s Party Needs & Event Rentals', category:'party', lat:14.5328115, lng:121.0118301, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'DJ partyneeds and mobile shop', category:'party', lat:14.5401163, lng:121.0025586, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Eyensee Photobooth Rental', category:'booth', lat:14.5397822, lng:120.99646, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'The Empire Tables and Chairs Rental', category:'booth', lat:14.5393596, lng:120.9912842, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'JJCmmetry Event Styling Services', category:'booth', lat:14.5427931, lng:121.0061565, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Nostalgia Photobooth MOA - Sm by The Bay', category:'booth', lat:14.5360919, lng:120.9792702, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Vin and Via\'s Gourmet & Party Rental', category:'party', lat:14.5451202, lng:121.0058038, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'NeilJ\'s General Mdse.', category:'indirect', lat:14.5454003, lng:121.0042783, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Lenirich Balloons and Party Needs', category:'party', lat:14.5466987, lng:120.9983097, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'PARTY NEEDS STORE', category:'party', lat:14.5465602, lng:120.9949826, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'ROY\'s BALLOONS & PARTY NEEDS', category:'party', lat:14.547977, lng:121.0019297, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'CEDAR PARTY NEEDS SHOP', category:'party', lat:14.5480471, lng:121.0024566, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Mackee Party Needs', category:'party', lat:14.5482128, lng:121.0020155, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Orangeangels', category:'indirect', lat:14.5492818, lng:121.0028074, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'ALX Office and School Supplies Trading', category:'indirect', lat:14.5500279, lng:121.0018704, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'EJIEBOY BALLOONS AND PARTY FAVORS', category:'party', lat:14.55018, lng:121.0055833, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Shockwave Photobooth Rental Manila', category:'booth', lat:14.550777, lng:121.0031582, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Ate Precy\'s Store', category:'indirect', lat:14.5517258, lng:121.0005862, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Flashy Hues Mirror Photo Booth', category:'booth', lat:14.556337, lng:120.9904032, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'Walking Photobooth - Photoman', category:'booth', lat:14.5568008, lng:120.9921455, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+      { id:uid(), name:'e-Guestbook', category:'booth', lat:14.5587968, lng:120.9930937, address:'', socials:'', servicesOffered:'', equipment:'', otherServices:'', threatLevel:null, notes:'' },
+    ],
+  };
+}
 if(state.teamMembers === null){
   state.teamMembers = [];
 }
@@ -1413,6 +1522,7 @@ function persistLocalOnly(){
   storageSet('am_party_bookings', state.partyBookings);
   storageSet('am_party_colors', state.partyColors);
   storageSet('am_pn_rentals', state.pnRentals);
+  storageSet('am_research', state.research);
   storageSet('am_tasks', state.tasks);
   storageSet('am_team_members', state.teamMembers);
   storageSet('am_party_inventory', state.partyInventory);
@@ -1545,6 +1655,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     item.classList.add('active');
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('page-'+item.dataset.page).classList.add('active');
+    if(item.dataset.page==='research') ensureResearchMap();
   });
 });
 document.querySelectorAll('#invTabs .tab').forEach(t=>{
@@ -1591,6 +1702,7 @@ function renderEverything(){
   renderJoStats();
   renderBir();
   renderHqBlocks();
+  renderResearchAll();
   renderPnEventsList();
   renderBookingsPage();
   renderPnJobsList();
@@ -1681,10 +1793,39 @@ function renderHqCellInput(blockId, rowIdx, col, val){
   return `<input value="${escapeHtml(val||'')}" oninput="updateHqCell('${blockId}',${rowIdx},'${col.key}',this.value)">`;
 }
 function renderTableBlockBody(b){
-  const headHtml = b.columns.map((c,ci)=>`<th>${escapeHtml(c.label)} <button class="icon-btn" style="padding:0 2px; font-size:10px;" onclick="deleteHqColumn('${b.id}',${ci})" title="Delete column">✕</button></th>`).join('');
+  const headHtml = b.columns.map((c,ci)=>`<th style="width:${c.width||140}px;">${escapeHtml(c.label)} <button class="icon-btn" style="padding:0 2px; font-size:10px;" onclick="deleteHqColumn('${b.id}',${ci})" title="Delete column">✕</button><span class="hq-col-resize-handle" onpointerdown="startColResize(event,'${b.id}',${ci})"></span></th>`).join('');
   const rowsHtml = b.rows.length ? b.rows.map((r,ri)=>`<tr>${b.columns.map(c=>`<td>${renderHqCellInput(b.id,ri,c,r[c.key])}</td>`).join('')}<td><button class="icon-btn" onclick="deleteHqTableRow('${b.id}',${ri})">🗑️</button></td></tr>`).join('') : `<tr class="empty-row"><td colspan="${b.columns.length+1}">No rows yet.</td></tr>`;
-  return `<div class="table-wrap"><table><thead><tr>${headHtml}<th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+  return `<div class="table-wrap"><table class="hq-datatable"><thead><tr>${headHtml}<th style="width:60px;"></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
     <button class="btn small secondary" style="margin-top:10px;" onclick="addHqTableRow('${b.id}')">+ Add Row</button>`;
+}
+let hqColResizeState = null;
+function startColResize(e, blockId, colIndex){
+  e.preventDefault(); e.stopPropagation();
+  const handle = e.currentTarget;
+  const th = handle.closest('th');
+  handle.classList.add('active');
+  handle.setPointerCapture(e.pointerId);
+  hqColResizeState = { blockId, colIndex, startX:e.clientX, startWidth:th.offsetWidth, th, handle };
+  handle.onpointermove = onColResizeMove;
+  handle.onpointerup = onColResizeEnd;
+}
+function onColResizeMove(e){
+  if(!hqColResizeState) return;
+  const delta = e.clientX - hqColResizeState.startX;
+  const newWidth = Math.max(60, hqColResizeState.startWidth + delta);
+  hqColResizeState.th.style.width = newWidth+'px';
+}
+function onColResizeEnd(e){
+  if(!hqColResizeState) return;
+  const delta = e.clientX - hqColResizeState.startX;
+  const newWidth = Math.max(60, hqColResizeState.startWidth + delta);
+  const b = state.hqBlocks.find(x=>x.id===hqColResizeState.blockId);
+  if(b) b.columns[hqColResizeState.colIndex].width = newWidth;
+  hqColResizeState.handle.classList.remove('active');
+  hqColResizeState.handle.onpointermove = null;
+  hqColResizeState.handle.onpointerup = null;
+  hqColResizeState = null;
+  saveAll();
 }
 function updateHqCell(blockId, rowIdx, key, val, isNumber){
   const b = state.hqBlocks.find(x=>x.id===blockId); if(!b) return;
@@ -1781,6 +1922,7 @@ function addHqBlock(type){
 function toggleHqBlockSize(id){
   const b = state.hqBlocks.find(x=>x.id===id); if(!b) return;
   b.size = b.size==='full' ? 'half' : 'full';
+  b.width = null; b.height = null;
   saveAll(); renderHqBlocks();
 }
 function renameHqBlock(id, title){
@@ -1877,24 +2019,48 @@ function renderHqBlockHtml(b){
   if(b.type==='callout') extraActions = `<button class="icon-btn" onclick="cycleCalloutColor('${b.id}')" title="Change color">🎨</button>`;
   const noBody = b.type==='divider' || b.type==='heading';
   const canResize = !noBody;
-  return `<div class="hq-block ${sizeClass} ${chromeClass}" data-block-id="${b.id}">
+  const dimStyle = (b.width?`width:${b.width}px;`:'') + (b.height?`height:${b.height}px;`:'');
+  return `<div class="hq-block ${sizeClass} ${chromeClass}" data-block-id="${b.id}" style="${dimStyle}">
     <div class="hq-block-header">
       <span class="hq-block-drag">⠿</span>
       <input class="hq-block-title" style="background:transparent; border:none; padding:2px 4px;" value="${escapeHtml(b.title)}" onchange="renameHqBlock('${b.id}', this.value)">
       <div class="hq-block-actions">
         ${extraActions}
-        ${canResize ? `<button class="icon-btn" onclick="toggleHqBlockSize('${b.id}')" title="Resize">${b.size==='full'?'↔️':'⛶'}</button>` : ''}
+        ${canResize ? `<button class="icon-btn" onclick="toggleHqBlockSize('${b.id}')" title="Snap full/half width">${b.size==='full'?'↔️':'⛶'}</button>` : ''}
         <button class="icon-btn" onclick="deleteHqBlock('${b.id}')" title="Delete block">🗑️</button>
       </div>
     </div>
     ${!noBody ? `<div class="hq-block-body">${bodyHtml}</div>` : ''}
   </div>`;
 }
+function captureHqBlockResize(el){
+  const id = el.dataset.blockId;
+  const b = state.hqBlocks.find(x=>x.id===id); if(!b) return;
+  const w = Math.round(el.offsetWidth), h = Math.round(el.offsetHeight);
+  if(b.width===w && b.height===h) return;
+  b.width = w; b.height = h;
+  saveAll();
+}
+function initHqBlockResizeCapture(){
+  document.querySelectorAll('#hqBlocksContainer .hq-block').forEach(el=>{
+    if(el._resizeObs) return;
+    if(!window.ResizeObserver) return;
+    let first = true;
+    const obs = new ResizeObserver(()=>{
+      if(first){ first=false; return; } // skip the initial layout firing
+      clearTimeout(el._resizeTimer);
+      el._resizeTimer = setTimeout(()=>captureHqBlockResize(el), 400);
+    });
+    obs.observe(el);
+    el._resizeObs = obs;
+  });
+}
 function renderHqBlocks(){
   const container = document.getElementById('hqBlocksContainer');
   if(!container) return;
   container.innerHTML = state.hqBlocks.map(renderHqBlockHtml).join('');
   initHqBlocksSortable();
+  initHqBlockResizeCapture();
 }
 
 /* ===================== REPORTS ===================== */
@@ -2184,6 +2350,248 @@ function checkForNewTaskAssignments(oldTasks, newTasks){
   });
 }
 
+/* ===================== RESEARCH (competitor radius map) ===================== */
+let researchMap = null;
+let researchTileSat = null, researchTileStreet = null;
+let researchMarkers = {};
+let researchActiveCategories = null;
+let researchSortKey = 'distance';
+let researchSortDir = 1;
+let researchActiveId = null;
+
+function haversineMeters(lat1,lng1,lat2,lng2){
+  const R=6371000, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function fmtDist(m){ return m>=1000 ? (Math.round(m/100)/10)+'km' : Math.round(m)+'m'; }
+function researchBandLabel(distM){
+  const bands = state.research.radiusBandsM;
+  if(distM<=bands[0]) return `0-${fmtDist(bands[0])}`;
+  for(let i=1;i<bands.length;i++){ if(distM<=bands[i]) return `${fmtDist(bands[i-1])}-${fmtDist(bands[i])}`; }
+  return `Beyond ${fmtDist(bands[bands.length-1])}`;
+}
+function researchComputed(){
+  const rp = state.research.referencePoint;
+  const pop = rp.catchmentPopulation || 16621;
+  const rows = state.research.competitors.map(c=>{
+    const distM = haversineMeters(rp.lat, rp.lng, c.lat, c.lng);
+    const distKm = Math.max(distM/1000, 0.01);
+    const raw = pop / Math.pow(distKm, 1.5);
+    return { ...c, distM, raw };
+  });
+  const maxRaw = Math.max(...rows.map(r=>r.raw), 0.0001);
+  rows.forEach(r=>{ r.index = +(r.raw/maxRaw*100).toFixed(1); r.band = researchBandLabel(r.distM); });
+  return rows;
+}
+function researchCatColor(cat){ return (state.research.categories[cat]||{}).color || '#999'; }
+function researchCatLabel(cat){ return (state.research.categories[cat]||{}).label || cat; }
+function ensureResearchMap(){
+  const rp = state.research.referencePoint;
+  if(researchMap){ setTimeout(()=>researchMap.invalidateSize(), 60); return; }
+  if(researchActiveCategories===null) researchActiveCategories = new Set(Object.keys(state.research.categories));
+  researchMap = L.map('researchMap', { scrollWheelZoom:false }).setView([rp.lat, rp.lng], 15);
+  researchTileSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'Tiles &copy; Esri', maxZoom:19 });
+  researchTileStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors', maxZoom:19 });
+  researchTileSat.addTo(researchMap);
+  document.getElementById('researchBasemapToggle').addEventListener('click', e=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    document.querySelectorAll('#researchBasemapToggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if(btn.dataset.mode==='sat'){ researchMap.removeLayer(researchTileStreet); researchTileSat.addTo(researchMap); }
+    else { researchMap.removeLayer(researchTileSat); researchTileStreet.addTo(researchMap); }
+  });
+  renderResearchCategoryChips();
+  redrawResearchStatics();
+  renderResearchAll();
+}
+function redrawResearchStatics(){
+  const rp = state.research.referencePoint;
+  (researchMap._researchStaticLayers||[]).forEach(l=>researchMap.removeLayer(l));
+  researchMap._researchStaticLayers = [];
+  state.research.radiusBandsM.forEach(r=>{
+    const circle = L.circle([rp.lat, rp.lng], { radius:r, color:'#d4af5a', weight:1.6, dashArray:'6,6', fillOpacity:0, opacity:.85 }).addTo(researchMap);
+    researchMap._researchStaticLayers.push(circle);
+  });
+  const refIcon = L.divIcon({ className:'', html:`<div style="position:relative;width:16px;height:16px;"><div style="position:absolute;inset:0;background:#fff;border-radius:50%;box-shadow:0 0 0 2px #14140f;"></div><div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid #fff;opacity:.55;animation:pulseRing 2.2s ease-out infinite;"></div></div>`, iconSize:[16,16], iconAnchor:[8,8] });
+  const refMarker = L.marker([rp.lat, rp.lng], { icon:refIcon, zIndexOffset:1000 }).addTo(researchMap).bindPopup(`<div class="research-pop-title">${escapeHtml(rp.label)}</div><div class="research-pop-row">${escapeHtml(rp.plusCode||'')}</div>`);
+  researchMap._researchStaticLayers.push(refMarker);
+  researchMap.setView([rp.lat, rp.lng], researchMap.getZoom());
+}
+function renderResearchCategoryChips(){
+  const bar = document.getElementById('researchFilterBar');
+  document.querySelectorAll('.research-cat-chip').forEach(el=>el.remove());
+  const toggleEl = document.getElementById('researchBasemapToggle');
+  Object.entries(state.research.categories).forEach(([key,meta])=>{
+    const btn = document.createElement('div');
+    btn.className = 'tab research-cat-chip' + (researchActiveCategories.has(key)?' active':'');
+    btn.innerHTML = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${meta.color}; margin-right:6px;"></span>${escapeHtml(meta.label)}`;
+    btn.onclick = ()=>{ if(researchActiveCategories.has(key)) researchActiveCategories.delete(key); else researchActiveCategories.add(key); renderResearchAll(); };
+    bar.insertBefore(btn, toggleEl);
+  });
+}
+function researchPopupHtml(c){
+  return `<div class="research-pop-title">${escapeHtml(c.name)}</div>
+    <span class="research-pop-cat" style="background:${researchCatColor(c.category)}22; color:${researchCatColor(c.category)};">${escapeHtml(researchCatLabel(c.category))}</span>
+    <div class="research-pop-row"><b>${fmtDist(c.distM)}</b> away &middot; ${c.band}</div>
+    <div class="research-pop-row">Foot-traffic index: <b>${c.index}</b></div>
+    <div class="research-pop-row">Services: ${escapeHtml(c.servicesOffered||'Not yet assessed')}</div>
+    <div class="research-pop-row">Equipment: ${escapeHtml(c.equipment||'Not yet assessed')}</div>
+    <div class="research-pop-row">Threat: ${escapeHtml(c.threatLevel||'Not yet rated')}</div>`;
+}
+function researchMatchesSearch(c){
+  const q = (document.getElementById('researchSearch').value||'').trim().toLowerCase();
+  return !q || c.name.toLowerCase().includes(q);
+}
+function renderResearchMarkers(rows){
+  const existingIds = new Set(Object.keys(researchMarkers));
+  rows.forEach(c=>{
+    const visible = researchActiveCategories.has(c.category) && researchMatchesSearch(c);
+    if(!researchMarkers[c.id]){
+      const icon = L.divIcon({ className:'', html:`<div style="width:14px;height:14px;border-radius:50%;background:${researchCatColor(c.category)};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);"></div>`, iconSize:[14,14], iconAnchor:[7,7] });
+      const m = L.marker([c.lat, c.lng], { icon });
+      m.on('click', ()=>selectResearchRow(c.id));
+      researchMarkers[c.id] = m;
+    }
+    researchMarkers[c.id].setPopupContent(researchPopupHtml(c));
+    researchMarkers[c.id].bindPopup(researchPopupHtml(c));
+    existingIds.delete(c.id);
+    if(visible){ if(!researchMap.hasLayer(researchMarkers[c.id])) researchMarkers[c.id].addTo(researchMap); }
+    else { if(researchMap.hasLayer(researchMarkers[c.id])) researchMap.removeLayer(researchMarkers[c.id]); }
+  });
+  existingIds.forEach(id=>{ if(researchMarkers[id]){ researchMap.removeLayer(researchMarkers[id]); delete researchMarkers[id]; } });
+}
+function setResearchSort(key){
+  if(researchSortKey===key) researchSortDir*=-1; else { researchSortKey=key; researchSortDir=1; }
+  renderResearchAll();
+}
+function researchSortVal(c,key){
+  if(key==='index') return c.index;
+  if(key==='threat') return c.threatLevel||'';
+  if(key==='category') return researchCatLabel(c.category);
+  if(key==='distance') return c.distM;
+  return c[key];
+}
+function renderResearchAll(){
+  if(researchActiveCategories===null) researchActiveCategories = new Set(Object.keys(state.research.categories));
+  const all = researchComputed();
+  const rows = all.filter(c=>researchActiveCategories.has(c.category) && researchMatchesSearch(c))
+    .sort((a,b)=>{ const va=researchSortVal(a,researchSortKey), vb=researchSortVal(b,researchSortKey);
+      if(typeof va==='string') return va.localeCompare(vb)*researchSortDir; return (va-vb)*researchSortDir; });
+  document.getElementById('researchCountTag').textContent = `${rows.length} of ${all.length} shown`;
+  const body = document.getElementById('researchTableBody');
+  body.innerHTML = rows.length ? rows.map(c=>{
+    const threatCls = c.threatLevel ? (c.threatLevel==='High'?'red':c.threatLevel==='Medium'?'orange':'green') : 'gray';
+    return `<tr class="${c.id===researchActiveId?'active-row':''}" style="cursor:pointer; ${c.id===researchActiveId?'box-shadow:inset 3px 0 0 var(--amber);':''}" onclick="selectResearchRow('${c.id}')">
+      <td><span class="badge gray"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:${researchCatColor(c.category)}; margin-right:5px;"></span>${escapeHtml(researchCatLabel(c.category))}</span></td>
+      <td>${escapeHtml(c.name)}</td>
+      <td class="mono">${fmtDist(c.distM)}</td>
+      <td style="color:var(--text-muted); font-size:12px;">${c.band}</td>
+      <td><span class="mono">${c.index}</span><span class="research-idx-track"><span class="research-idx-fill" style="width:${c.index}%; background:${researchCatColor(c.category)};"></span></span></td>
+      <td><span class="badge ${threatCls}">${escapeHtml(c.threatLevel||'Unrated')}</span></td>
+      <td onclick="event.stopPropagation();"><button class="icon-btn" onclick="openResearchCompModal('${c.id}')">✏️</button><button class="icon-btn" onclick="deleteResearchComp('${c.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="7">No competitors match this filter.</td></tr>`;
+  if(researchMap) renderResearchMarkers(all);
+}
+function selectResearchRow(id){
+  researchActiveId = id;
+  const c = state.research.competitors.find(x=>x.id===id);
+  if(!c) return;
+  if(researchMap){
+    researchMap.flyTo([c.lat, c.lng], 18, { duration:.6 });
+    if(researchMarkers[id]) researchMarkers[id].openPopup();
+  }
+  renderResearchAll();
+}
+function openResearchRefModal(){
+  const rp = state.research.referencePoint;
+  document.getElementById('modalBody').innerHTML = `
+    <h3>⚙ Reference Point</h3>
+    <div class="flag-hint" style="margin-bottom:10px;">Your physical store location — every distance and index is measured from here.</div>
+    <div class="field"><label>Label</label><input id="rp_label" value="${escapeHtml(rp.label)}"></div>
+    <div class="field"><label>Plus Code / Address (optional)</label><input id="rp_pluscode" value="${escapeHtml(rp.plusCode||'')}"></div>
+    <div class="field-row">
+      <div class="field"><label>Latitude</label><input id="rp_lat" type="number" step="any" value="${rp.lat}"></div>
+      <div class="field"><label>Longitude</label><input id="rp_lng" type="number" step="any" value="${rp.lng}"></div>
+    </div>
+    <div class="field"><label>Catchment Population (for foot-traffic index)</label><input id="rp_pop" type="number" value="${rp.catchmentPopulation||16621}"></div>
+    <div class="flag-hint">Tip: open Google Maps, long-press your store's pin, and tap the coordinates that pop up to copy them.</div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveResearchRef()">Save</button></div>`;
+  openModal();
+}
+function saveResearchRef(){
+  const rp = state.research.referencePoint;
+  rp.label = document.getElementById('rp_label').value.trim() || rp.label;
+  rp.plusCode = document.getElementById('rp_pluscode').value.trim();
+  rp.lat = Number(document.getElementById('rp_lat').value) || rp.lat;
+  rp.lng = Number(document.getElementById('rp_lng').value) || rp.lng;
+  rp.catchmentPopulation = Number(document.getElementById('rp_pop').value) || 16621;
+  saveAll(); closeModal(); toast('Reference point updated');
+  if(researchMap){ redrawResearchStatics(); }
+  renderResearchAll();
+}
+function openResearchCompModal(id){
+  const c = id ? state.research.competitors.find(x=>x.id===id) : null;
+  const categories = Object.entries(state.research.categories);
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${c?'Edit':'Add'} Competitor</h3>
+    <div class="field"><label>Business Name</label><input id="rc_name" value="${c?escapeHtml(c.name):''}"></div>
+    <div class="field"><label>Category</label><select id="rc_category">${categories.map(([k,v])=>`<option value="${k}" ${c&&c.category===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}</select></div>
+    <div class="field-row">
+      <div class="field"><label>Latitude</label><input id="rc_lat" type="number" step="any" value="${c?c.lat:''}"></div>
+      <div class="field"><label>Longitude</label><input id="rc_lng" type="number" step="any" value="${c?c.lng:''}"></div>
+    </div>
+    <div class="flag-hint" style="margin-bottom:10px;">Distance and foot-traffic index are auto-calculated from these coordinates — copy them from Google Maps.</div>
+    <div class="field"><label>Address</label><input id="rc_address" value="${c?escapeHtml(c.address||''):''}"></div>
+    <div class="field"><label>Social Accounts</label><input id="rc_socials" value="${c?escapeHtml(c.socials||''):''}" placeholder="FB: ..., IG: ..., TikTok: ..."></div>
+    <div class="field"><label>Services Offered</label><textarea id="rc_services" rows="2">${c?escapeHtml(c.servicesOffered||''):''}</textarea></div>
+    <div class="field"><label>Machines &amp; Equipment</label><textarea id="rc_equipment" rows="2">${c?escapeHtml(c.equipment||''):''}</textarea></div>
+    <div class="field"><label>Other Services</label><textarea id="rc_other" rows="2">${c?escapeHtml(c.otherServices||''):''}</textarea></div>
+    <div class="field"><label>Threat Level</label><select id="rc_threat">
+      <option value="">Unrated</option>
+      <option ${c&&c.threatLevel==='Low'?'selected':''}>Low</option>
+      <option ${c&&c.threatLevel==='Medium'?'selected':''}>Medium</option>
+      <option ${c&&c.threatLevel==='High'?'selected':''}>High</option>
+    </select></div>
+    <div class="field"><label>Notes</label><textarea id="rc_notes" rows="2">${c?escapeHtml(c.notes||''):''}</textarea></div>
+    <div class="modal-actions">
+      ${c?`<button class="btn danger" onclick="deleteResearchComp('${c.id}',true)">Delete</button>`:''}
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveResearchComp(${c?`'${c.id}'`:'null'})">Save</button>
+    </div>`;
+  openModal();
+}
+function saveResearchComp(id){
+  const name = document.getElementById('rc_name').value.trim();
+  const lat = Number(document.getElementById('rc_lat').value);
+  const lng = Number(document.getElementById('rc_lng').value);
+  if(!name){ toast('Business name is required'); return; }
+  if(!lat || !lng){ toast('Latitude and longitude are required'); return; }
+  const payload = {
+    name, category: document.getElementById('rc_category').value, lat, lng,
+    address: document.getElementById('rc_address').value.trim(),
+    socials: document.getElementById('rc_socials').value.trim(),
+    servicesOffered: document.getElementById('rc_services').value.trim(),
+    equipment: document.getElementById('rc_equipment').value.trim(),
+    otherServices: document.getElementById('rc_other').value.trim(),
+    threatLevel: document.getElementById('rc_threat').value || null,
+    notes: document.getElementById('rc_notes').value.trim(),
+  };
+  if(id){ const c = state.research.competitors.find(x=>x.id===id); Object.assign(c, payload); }
+  else { state.research.competitors.push({ id: uid(), ...payload }); }
+  saveAll(); closeModal(); toast('Saved'); renderResearchAll();
+}
+function deleteResearchComp(id, fromModal){
+  if(!confirm('Delete this competitor?')) return;
+  state.research.competitors = state.research.competitors.filter(c=>c.id!==id);
+  if(researchMarkers[id]){ if(researchMap) researchMap.removeLayer(researchMarkers[id]); delete researchMarkers[id]; }
+  saveAll();
+  if(fromModal) closeModal();
+  renderResearchAll();
+}
+
 /* ===================== DASHBOARD ===================== */
 function renderDashboard(){
   const today = todayStr(); const weekStart = daysAgoStr(6); const monthPrefix = today.slice(0,7);
@@ -2415,42 +2823,104 @@ function confirmCsvImport(){
 
 /* ===================== RESTOCK ===================== */
 function renderRestock(){
-  const body = document.getElementById('restockBody');
-  if(!state.restock.length){ body.innerHTML = `<tr class="empty-row"><td colspan="8">Nothing in the restock plan yet.</td></tr>`; return; }
-  body.innerHTML = state.restock.map(r=>`<tr>
-    <td>${escapeHtml(r.product_name)}</td><td>${escapeHtml(r.category||'—')}</td><td>${r.pcs_per_pack??'—'}</td><td>${peso(r.cost_price)}</td><td>${r.qty_buying??0}</td><td>${peso((r.cost_price||0)*(r.qty_buying||0))}</td>
-    <td><span class="badge ${r.status==='Bought'?'green':r.status==='Cancelled'?'gray':'orange'}">${r.status}</span></td>
-    <td>${r.status==='Pending'?`<button class="icon-btn" onclick="markBought('${r.id}')">✅</button>`:''}<button class="icon-btn" onclick="deleteRestock('${r.id}')">🗑️</button></td>
-  </tr>`).join('');
+  const showHidden = document.getElementById('restockShowHidden')?.checked;
+  const list = document.getElementById('restockList');
+  if(!list) return;
+  const items = showHidden ? state.restock : state.restock.filter(r=>r.show!==false);
+  if(!items.length){ list.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:30px;">Nothing in the restock plan yet.</div>`; return; }
+  list.innerHTML = items.map(r=>{
+    const total = (r.cost_price||0)*(r.qty_buying||0);
+    return `<div class="card" style="${r.show===false?'opacity:.55;':''}">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; gap:8px;">
+        <div>
+          <div style="font-weight:600; font-size:14px;">${escapeHtml(r.product_name)}</div>
+          <span class="badge gray" style="margin-top:4px;">${escapeHtml(r.category||'Uncategorized')}</span>
+        </div>
+        <span class="badge ${r.status==='Bought'?'green':r.status==='Cancelled'?'gray':'orange'}">${escapeHtml(r.status)}</span>
+      </div>
+      <div style="font-size:12.5px; color:var(--text-muted); line-height:2;">
+        <div>Price <span style="float:right; color:var(--text); font-weight:600;">${r.sell_price?peso(r.sell_price):'—'}</span></div>
+        <div>Cost Price <span style="float:right; color:var(--text);">${peso(r.cost_price)}</span></div>
+        <div>Pcs / Pack <span style="float:right; color:var(--text);">${r.pcs_per_pack??'—'}</span></div>
+        <div>Qty Buying <span style="float:right; color:var(--text);">${r.qty_buying??0}</span></div>
+        <div style="border-top:1px solid var(--border); margin-top:4px; padding-top:6px;">Total Cost <span style="float:right; color:var(--amber); font-weight:700;">${peso(total)}</span></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; text-transform:none; margin:0; cursor:pointer;">
+          <input type="checkbox" ${r.show!==false?'checked':''} style="width:auto;" onchange="toggleRestockShow('${r.id}',this.checked)"> Show
+        </label>
+        <div style="display:flex; gap:2px;">
+          ${r.status==='Pending'?`<button class="icon-btn" onclick="markBought('${r.id}')">✅</button>`:''}
+          <button class="icon-btn" onclick="openRestockModal('${r.id}')">✏️</button>
+          <button class="icon-btn" onclick="deleteRestock('${r.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
-function openRestockModal(){
+function toggleRestockShow(id, val){
+  const r = state.restock.find(x=>x.id===id); if(!r) return;
+  r.show = val; saveAll(); renderRestock();
+}
+function openRestockModal(id){
+  const r = id ? state.restock.find(x=>x.id===id) : null;
   const options = state.products.map(p=>`<option value="${p.id}" data-name="${escapeHtml(p.name)}" data-cat="${p.category}">${escapeHtml(p.name)} (${p.id})</option>`).join('');
+  const existingCats = [...new Set(state.restock.map(x=>x.category).filter(Boolean))];
   document.getElementById('modalBody').innerHTML = `
-    <h3>Add to Restock Plan</h3>
+    <h3>${r?'Edit':'Add to'} Restock Plan</h3>
     <div class="field"><label>Link to product (optional)</label><select id="r_product" onchange="onRestockProductChange()"><option value="">— manual entry —</option>${options}</select></div>
-    <div class="field"><label>Product Name</label><input id="r_name"></div>
-    <div class="field-row"><div class="field"><label>Pcs per Pack</label><input id="r_pcs" type="number" step="any"></div><div class="field"><label>Cost Price</label><input id="r_cost" type="number" step="any"></div></div>
-    <div class="field"><label>Qty Buying</label><input id="r_qty" type="number" step="any" value="1"></div>
-    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveRestock()">Add</button></div>`;
+    <div class="field"><label>Product Name</label><input id="r_name" value="${r?escapeHtml(r.product_name):''}"></div>
+    <div class="field"><label>Category</label><input id="r_category" list="r_categoryList" value="${r?escapeHtml(r.category||''):''}" placeholder="Type any category — yours to name"></div>
+    <datalist id="r_categoryList">${existingCats.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <div class="field-row">
+      <div class="field"><label>Pcs per Pack</label><input id="r_pcs" type="number" step="any" value="${r&&r.pcs_per_pack?r.pcs_per_pack:''}"></div>
+      <div class="field"><label>Cost Price</label><input id="r_cost" type="number" step="any" value="${r?r.cost_price:''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Price (sell)</label><input id="r_price" type="number" step="any" value="${r&&r.sell_price?r.sell_price:''}"></div>
+      <div class="field"><label>Qty Buying</label><input id="r_qty" type="number" step="any" value="${r?r.qty_buying:1}"></div>
+    </div>
+    <div class="modal-actions">
+      ${r?`<button class="btn danger" onclick="deleteRestock('${r.id}',true)">Delete</button>`:''}
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveRestock(${r?`'${r.id}'`:'null'})">Save</button>
+    </div>`;
   openModal();
 }
-function onRestockProductChange(){ const sel=document.getElementById('r_product'); const opt=sel.options[sel.selectedIndex]; document.getElementById('r_name').value = opt.dataset.name||''; }
-function saveRestock(){
-  const sel = document.getElementById('r_product'); const opt = sel.options[sel.selectedIndex]; const productId = sel.value||null;
+function onRestockProductChange(){
+  const sel=document.getElementById('r_product'); const opt=sel.options[sel.selectedIndex];
+  document.getElementById('r_name').value = opt.dataset.name||'';
+  if(opt.dataset.cat) document.getElementById('r_category').value = opt.dataset.cat;
+}
+function saveRestock(id){
+  const sel = document.getElementById('r_product'); const productId = sel.value||null;
   const name = document.getElementById('r_name').value.trim();
   if(!name){ toast('Product name required'); return; }
-  state.restock.unshift({ id: uid(), product_id: productId, product_name: name, category: productId?opt.dataset.cat:null,
-    pcs_per_pack: Number(document.getElementById('r_pcs').value)||null, cost_price: Number(document.getElementById('r_cost').value)||0,
-    qty_buying: Number(document.getElementById('r_qty').value)||1, status:'Pending' });
-  saveAll(); closeModal(); toast('Added to restock plan'); renderAll();
+  const payload = {
+    product_id: productId, product_name: name,
+    category: document.getElementById('r_category').value.trim() || 'Uncategorized',
+    pcs_per_pack: Number(document.getElementById('r_pcs').value)||null,
+    cost_price: Number(document.getElementById('r_cost').value)||0,
+    sell_price: Number(document.getElementById('r_price').value)||0,
+    qty_buying: Number(document.getElementById('r_qty').value)||1,
+  };
+  if(id){ const r = state.restock.find(x=>x.id===id); Object.assign(r, payload); }
+  else { state.restock.unshift({ id: uid(), status:'Pending', show:true, ...payload }); }
+  saveAll(); closeModal(); toast('Saved'); renderRestock();
 }
 function markBought(id){
   const r = state.restock.find(x=>x.id===id); if(!r) return;
   r.status='Bought';
   if(r.product_id){ const product = state.products.find(p=>p.id===r.product_id); if(product) product.stock = Number(product.stock||0)+Number(r.qty_buying||0); }
-  saveAll(); toast('Marked bought — stock updated'); renderAll();
+  saveAll(); toast('Marked bought — stock updated'); renderRestock();
 }
-function deleteRestock(id){ if(!confirm('Remove from restock plan?')) return; state.restock = state.restock.filter(r=>r.id!==id); saveAll(); toast('Removed'); renderAll(); }
+function deleteRestock(id, fromModal){
+  if(!confirm('Remove from restock plan?')) return;
+  state.restock = state.restock.filter(r=>r.id!==id);
+  saveAll();
+  if(fromModal) closeModal();
+  toast('Removed'); renderRestock();
+}
 
 /* ===================== CUSTOMERS ===================== */
 function renderCustomers(){
@@ -3571,22 +4041,41 @@ document.getElementById('psTabs').addEventListener('click', e=>{
   psActiveCategory = t.dataset.cat;
   renderPrintSupplies();
 });
+function renderPsCategoryTabs(){
+  const tabsEl = document.getElementById('psTabs');
+  const categories = [...new Set(state.printSupplies.map(s=>s.category).filter(Boolean))];
+  tabsEl.innerHTML = `<div class="tab ${psActiveCategory==='All'?'active':''}" data-cat="All">All</div>` +
+    categories.map(c=>`<div class="tab ${psActiveCategory===c?'active':''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)} <span onclick="event.stopPropagation(); renamePsCategory('${c.replace(/'/g,"\\'")}')" style="opacity:.6; margin-left:4px;" title="Rename category">✏️</span></div>`).join('');
+}
+function renamePsCategory(oldCat){
+  const newCat = prompt('Rename category "'+oldCat+'" to:', oldCat);
+  if(!newCat || !newCat.trim() || newCat.trim()===oldCat) return;
+  state.printSupplies.forEach(s=>{ if(s.category===oldCat) s.category = newCat.trim(); });
+  if(psActiveCategory===oldCat) psActiveCategory = newCat.trim();
+  saveAll(); toast('Category renamed'); renderPrintSupplies();
+}
 function renderPrintSupplies(){
+  renderPsCategoryTabs();
   const grid = document.getElementById('printSuppliesGrid');
   const q = (document.getElementById('psSearch').value||'').toLowerCase();
   let items = state.printSupplies;
   if(psActiveCategory!=='All') items = items.filter(s=>s.category===psActiveCategory);
-  if(q) items = items.filter(s=>(s.name+' '+s.description).toLowerCase().includes(q));
+  if(q) items = items.filter(s=>(s.name+' '+(s.infoLines||[]).map(l=>l.text).join(' ')).toLowerCase().includes(q));
   if(!items.length){ grid.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:30px;">No supplies added yet.</div>`; return; }
-  grid.innerHTML = items.map(s=>`
+  grid.innerHTML = items.map(s=>{
+    const visibleLines = (s.infoLines||[]).filter(l=>l.visible!==false && l.text);
+    return `
     <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column;">
       <div style="width:100%; aspect-ratio:1; background:var(--surface-2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
         ${s.image?`<img src="${s.image}" style="width:100%; height:100%; object-fit:cover;">`:'<span style="font-size:36px; opacity:.4;">🖼️</span>'}
       </div>
       <div style="padding:12px 14px; flex:1; display:flex; flex-direction:column;">
-        <span class="badge gray" style="width:fit-content; margin-bottom:6px;">${escapeHtml(s.category||'Uncategorized')}</span>
-        <div style="font-weight:600; font-size:13.5px; margin-bottom:4px;">${escapeHtml(s.name)}</div>
-        <div style="font-size:12px; color:var(--text-muted); line-height:1.5; margin-bottom:8px; flex:1;">${escapeHtml(s.description||'')}</div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:6px;">
+          <span class="badge gray">${escapeHtml(s.category||'Uncategorized')}</span>
+          ${s.price?`<span class="stat-value amber" style="font-size:16px;">${peso(s.price)}</span>`:''}
+        </div>
+        <div style="font-weight:600; font-size:13.5px; margin-bottom:6px;">${escapeHtml(s.name)}</div>
+        ${visibleLines.length ? `<ul style="margin:0 0 8px; padding-left:16px; font-size:12px; color:var(--text-muted); line-height:1.6; flex:1;">${visibleLines.map(l=>`<li>${escapeHtml(l.text)}</li>`).join('')}</ul>` : '<div style="flex:1;"></div>'}
         ${s.location?`<div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">📍 ${escapeHtml(s.location)}</div>`:''}
         <div style="display:flex; gap:6px;">
           <button class="btn small" style="flex:1; justify-content:center;" onclick="${s.link?`window.open('${escapeHtml(s.link)}','_blank')`:`toast('No link added yet')`}">🔗 View Deal</button>
@@ -3594,41 +4083,64 @@ function renderPrintSupplies(){
           <button class="icon-btn" onclick="deleteSupply('${s.id}')">🗑️</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 let supplyImageDraft = null;
+let supplyInfoLinesDraft = [];
 function onSupplyImageUpload(e){
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = ()=>{ supplyImageDraft = reader.result; toast('Image loaded'); };
   reader.readAsDataURL(file);
 }
+function renderSupplyInfoLines(){
+  document.getElementById('sp_infolines').innerHTML = supplyInfoLinesDraft.map((l,i)=>`
+    <div class="hq-list-row">
+      <input type="checkbox" ${l.visible!==false?'checked':''} style="width:auto;" title="Show on card" onchange="updateSupplyInfoLine(${i},'visible',this.checked)">
+      <input value="${escapeHtml(l.text)}" placeholder="e.g. 20 sheets per pack" oninput="updateSupplyInfoLine(${i},'text',this.value)">
+      <button class="icon-btn" onclick="removeSupplyInfoLine(${i})">✕</button>
+    </div>`).join('') + `
+    <div class="hq-list-row">
+      <input type="checkbox" disabled style="width:auto; opacity:.3;">
+      <input placeholder="Add info line, press Enter" onkeydown="if(event.key==='Enter'){addSupplyInfoLine(this.value); this.value='';}">
+    </div>`;
+}
+function addSupplyInfoLine(val){ if(!val.trim()) return; supplyInfoLinesDraft.push({text:val.trim(), visible:true}); renderSupplyInfoLines(); }
+function updateSupplyInfoLine(i,field,val){ supplyInfoLinesDraft[i][field]=val; if(field==='visible') renderSupplyInfoLines(); }
+function removeSupplyInfoLine(i){ supplyInfoLinesDraft.splice(i,1); renderSupplyInfoLines(); }
 function openSupplyModal(id){
   const s = id ? state.printSupplies.find(x=>x.id===id) : null;
   supplyImageDraft = s ? s.image : null;
+  supplyInfoLinesDraft = s && s.infoLines ? JSON.parse(JSON.stringify(s.infoLines)) : (s && s.description ? [{text:s.description, visible:true}] : []);
+  const categories = [...new Set(state.printSupplies.map(x=>x.category).filter(Boolean))];
   document.getElementById('modalBody').innerHTML = `
     <h3>${s?'Edit':'Add'} Supply</h3>
     <div class="field"><label>Product Name</label><input id="sp_name" value="${s?escapeHtml(s.name):''}" placeholder="e.g. RC Satin Photo Paper"></div>
-    <div class="field"><label>Category</label>
-      <select id="sp_category">
-        <option ${s&&s.category==='Packaging Materials'?'selected':''}>Packaging Materials</option>
-        <option ${s&&s.category==='Papers & Cards'?'selected':''}>Papers &amp; Cards</option>
-        <option ${s&&s.category==='Tools & Accessories'?'selected':''}>Tools &amp; Accessories</option>
-      </select>
+    <div class="field-row">
+      <div class="field"><label>Category</label><input id="sp_category" list="sp_categoryList" value="${s?escapeHtml(s.category||''):''}" placeholder="Existing or new"></div>
+      <div class="field"><label>Price (₱)</label><input id="sp_price" type="number" step="any" value="${s&&s.price?s.price:''}"></div>
     </div>
-    <div class="field"><label>Description</label><textarea id="sp_desc" rows="3">${s?escapeHtml(s.description||''):''}</textarea></div>
+    <datalist id="sp_categoryList">${categories.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <div class="field">
+      <label>Info Lines <span style="text-transform:none; font-weight:400;">— check the box to show it on the card</span></label>
+      <div id="sp_infolines"></div>
+    </div>
     <div class="field"><label>Product Image</label><input type="file" accept="image/*" onchange="onSupplyImageUpload(event)"></div>
     <div class="field"><label>Buy Link (URL)</label><input id="sp_link" value="${s?escapeHtml(s.link||''):''}" placeholder="https://..."></div>
     <div class="field"><label>Location / Store</label><input id="sp_location" value="${s?escapeHtml(s.location||''):''}" placeholder="e.g. Lazada — Yopsun Official Store"></div>
     <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveSupply(${s?`'${s.id}'`:'null'})">Save</button></div>`;
+  renderSupplyInfoLines();
   openModal();
 }
 function saveSupply(id){
   const name = document.getElementById('sp_name').value.trim();
+  const category = document.getElementById('sp_category').value.trim();
   if(!name){ toast('Product name required'); return; }
   const payload = {
-    name, category: document.getElementById('sp_category').value,
-    description: document.getElementById('sp_desc').value.trim(),
+    name, category: category || 'Uncategorized',
+    price: Number(document.getElementById('sp_price').value)||0,
+    infoLines: supplyInfoLinesDraft.filter(l=>l.text && l.text.trim()),
     image: supplyImageDraft, link: document.getElementById('sp_link').value.trim(),
     location: document.getElementById('sp_location').value.trim(),
   };
