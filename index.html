@@ -173,6 +173,7 @@
   .hq-block-actions{ display:flex; gap:0; flex-shrink:0; }
   .hq-block-body{ padding:12px 14px 14px; }
   .hq-block.sortable-ghost{ opacity:.3; }
+  .nav-item.sortable-ghost{ opacity:.3; }
   .hq-mission-field label{ margin-bottom:4px; }
   .hq-list-row{ display:flex; align-items:center; gap:8px; padding:3px 0; }
   .hq-list-row input[type=text], .hq-list-row input:not([type]){ flex:1; background:transparent; border:none; padding:3px 4px; font-size:13px; }
@@ -257,7 +258,7 @@
       <div class="nav-item" data-page="bir"><span class="nav-icon">🏛️</span> BIR Calculator</div>
       <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</div>
     </nav>
-    <div class="sidebar-foot" id="sidebarFoot"><span class="conn-dot" id="connDot" style="background:var(--gold);"></span><span id="connText">Saved locally on this device</span></div>
+    <div class="sidebar-foot" id="sidebarFoot"><span class="conn-dot" id="connDot" style="background:var(--gold);"></span><span id="connText">Saved locally on this device</span><br><span style="opacity:.6;">Press &amp; hold a tab to reorder</span></div>
   </div>
 
   <div id="main">
@@ -1238,6 +1239,7 @@ let state = {
   partyColors: storageGet('am_party_colors', null),
   pnRentals: storageGet('am_pn_rentals', null),
   research: storageGet('am_research', null),
+  navOrder: storageGet('am_nav_order', []),
   tasks: storageGet('am_tasks', []),
   teamMembers: storageGet('am_team_members', null),
   partyInventory: storageGet('am_party_inventory', null),
@@ -1523,6 +1525,7 @@ function persistLocalOnly(){
   storageSet('am_party_colors', state.partyColors);
   storageSet('am_pn_rentals', state.pnRentals);
   storageSet('am_research', state.research);
+  storageSet('am_nav_order', state.navOrder);
   storageSet('am_tasks', state.tasks);
   storageSet('am_team_members', state.teamMembers);
   storageSet('am_party_inventory', state.partyInventory);
@@ -1641,6 +1644,7 @@ async function doLogin(){
   await pullFromSupabase();
   ensureCurrentUserInTeam();
   renderEverything();
+  initNavSortable();
   subscribeToRealtimeUpdates();
 }
 async function doLogout(){
@@ -1658,6 +1662,32 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.page==='research') ensureResearchMap();
   });
 });
+function navKeyOf(el){ return el.classList.contains('nav-divider') ? 'd:'+el.textContent.trim() : 'i:'+el.dataset.page; }
+function applyNavOrder(){
+  if(!state.navOrder || !state.navOrder.length) return;
+  const navEl = document.querySelector('#sidebar nav');
+  const byKey = {};
+  [...navEl.children].forEach(el=>{ byKey[navKeyOf(el)] = el; });
+  const frag = document.createDocumentFragment();
+  state.navOrder.forEach(key=>{ if(byKey[key]){ frag.appendChild(byKey[key]); delete byKey[key]; } });
+  Object.values(byKey).forEach(el=>frag.appendChild(el)); // anything new since last save (e.g. app updates) goes at the end
+  navEl.appendChild(frag);
+}
+function saveNavOrder(){
+  const navEl = document.querySelector('#sidebar nav');
+  state.navOrder = [...navEl.children].map(navKeyOf);
+  saveAll();
+}
+let navSortable = null;
+function initNavSortable(){
+  const navEl = document.querySelector('#sidebar nav');
+  if(navSortable) navSortable.destroy();
+  navSortable = Sortable.create(navEl, {
+    animation:150, filter:'.nav-divider', preventOnFilter:false,
+    delay:150, delayOnTouchOnly:true,
+    onEnd: saveNavOrder
+  });
+}
 document.querySelectorAll('#invTabs .tab').forEach(t=>{
   t.addEventListener('click', ()=>{
     document.querySelectorAll('#invTabs .tab').forEach(x=>x.classList.remove('active'));
@@ -1678,9 +1708,11 @@ async function boot(){
   await pullFromSupabase();
   ensureCurrentUserInTeam();
   renderEverything();
+  initNavSortable();
   subscribeToRealtimeUpdates();
 }
 function renderEverything(){
+  applyNavOrder();
   document.getElementById('settingsDays').value = state.settings.days_per_month;
   const emailEl = document.getElementById('accountEmail');
   if(emailEl) emailEl.textContent = currentUser ? currentUser.email : '—';
