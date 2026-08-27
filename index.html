@@ -815,7 +815,7 @@
       <div class="tabbar" id="mpCategoryTabs"></div>
       <div class="card" style="padding:0;">
         <div class="table-wrap"><table>
-          <thead><tr><th>Product</th><th>Paper</th><th>Ink</th><th>Op</th><th>Minutes</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Product</th><th>Cost to Make</th><th>Minutes</th><th>Details</th><th></th></tr></thead>
           <tbody id="printProductsBody"></tbody>
         </table></div>
       </div>
@@ -3909,34 +3909,85 @@ function renderPrintProducts(){
   tabsEl.innerHTML = categories.map(c=>`<div class="tab ${c===mpActiveCategory?'active':''}" onclick="selectMpCategory('${c.replace(/'/g,"\\'")}')">${escapeHtml(c)}</div>`).join('');
   const body = document.getElementById('printProductsBody');
   const items = mpActiveCategory ? state.printProducts.filter(p=>p.category===mpActiveCategory) : [];
-  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No products in this category yet.</td></tr>`; return; }
-  body.innerHTML = items.map(p=>`<tr>
-    <td>${escapeHtml(p.name)}</td><td>${peso(p.paper)}</td><td>${peso(p.ink)}</td><td>${peso(p.op)}</td><td>${p.minutes}</td>
-    <td><button class="icon-btn" onclick="openProductTemplateModal('${p.id}')">✏️</button><button class="icon-btn" onclick="deleteProductTemplate('${p.id}')">🗑️</button></td>
-  </tr>`).join('');
+  if(!items.length){ body.innerHTML = `<tr class="empty-row"><td colspan="6">No products in this category yet — click + Add Product to create one.</td></tr>`; return; }
+  body.innerHTML = items.map(p=>{
+    const costToMake = (p.paper||0)+(p.ink||0)+(p.op||0);
+    const fieldCount = (p.customFields||[]).length;
+    return `<tr style="cursor:pointer;" onclick="openProductTemplateModal('${p.id}')">
+      <td>${p.image?`<img src="${p.image}" style="width:36px; height:36px; object-fit:cover; border-radius:6px; display:block;">`:`<div style="width:36px; height:36px; border-radius:6px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:14px;">🖼️</div>`}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${peso(costToMake)}</td>
+      <td>${p.minutes}</td>
+      <td>${fieldCount?`<span class="badge gray">${fieldCount} detail${fieldCount>1?'s':''}</span>`:'<span class="flag-hint">—</span>'}</td>
+      <td onclick="event.stopPropagation();"><button class="icon-btn" onclick="openProductTemplateModal('${p.id}')">✏️</button><button class="icon-btn" onclick="deleteProductTemplate('${p.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
 }
 function selectMpCategory(c){ mpActiveCategory = c; renderPrintProducts(); }
+let productImageDraft = null;
+let ptCustomFieldsDraft = [];
+function onPtImageUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    productImageDraft = reader.result;
+    document.getElementById('ptImagePreviewWrap').innerHTML = `<img src="${productImageDraft}" style="width:100%; max-height:180px; object-fit:cover; border-radius:8px; display:block;">`;
+  };
+  reader.readAsDataURL(file);
+}
+function updatePtCostPreview(){
+  const paper = Number(document.getElementById('pt_paper').value)||0;
+  const ink = Number(document.getElementById('pt_ink').value)||0;
+  const op = Number(document.getElementById('pt_op').value)||0;
+  document.getElementById('ptCostToMake').textContent = peso(paper+ink+op);
+}
+function renderPtCustomFields(){
+  document.getElementById('ptCustomFieldsList').innerHTML = ptCustomFieldsDraft.length ? ptCustomFieldsDraft.map((f,i)=>`
+    <div class="cost-row-2" style="grid-template-columns:1fr 1.4fr auto;">
+      <input value="${escapeHtml(f.label)}" placeholder="Label (e.g. Materials Needed)" oninput="updatePtCustomField(${i},'label',this.value)">
+      <input value="${escapeHtml(f.value)}" placeholder="Value (e.g. Cardstock, glue, ribbon)" oninput="updatePtCustomField(${i},'value',this.value)">
+      <button class="icon-btn" onclick="removePtCustomField(${i})">🗑️</button>
+    </div>`).join('') : `<div class="flag-hint" style="margin-bottom:8px;">No custom details yet — add anything you want to remember about making this.</div>`;
+}
+function addPtCustomField(){ ptCustomFieldsDraft.push({label:'',value:''}); renderPtCustomFields(); }
+function updatePtCustomField(i,field,val){ ptCustomFieldsDraft[i][field]=val; }
+function removePtCustomField(i){ ptCustomFieldsDraft.splice(i,1); renderPtCustomFields(); }
 function openProductTemplateModal(id){
   const p = id ? state.printProducts.find(x=>x.id===id) : null;
   const categories = [...new Set(state.printProducts.map(x=>x.category))];
+  productImageDraft = p ? (p.image||null) : null;
+  ptCustomFieldsDraft = p && p.customFields ? p.customFields.map(f=>({...f})) : [];
   document.getElementById('modalBody').innerHTML = `
     <h3>${p?'Edit':'Add'} Product</h3>
+    <div class="field">
+      <label>Sample Picture</label>
+      <div id="ptImagePreviewWrap" style="margin-bottom:8px;">${productImageDraft?`<img src="${productImageDraft}" style="width:100%; max-height:180px; object-fit:cover; border-radius:8px; display:block;">`:''}</div>
+      <input type="file" accept="image/*" onchange="onPtImageUpload(event)">
+    </div>
     <div class="field"><label>Category</label><input id="pt_category" list="pt_categoryList" value="${p?escapeHtml(p.category):(mpActiveCategory?escapeHtml(mpActiveCategory):'')}" placeholder="e.g. Photoprint (existing or new)"></div>
     <datalist id="pt_categoryList">${categories.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
     <div class="field"><label>Product Name</label><input id="pt_name" value="${p?escapeHtml(p.name):''}" placeholder="e.g. 4R Size"></div>
     <div class="field-row">
-      <div class="field"><label>Paper Cost (₱/unit)</label><input id="pt_paper" type="number" step="any" value="${p?p.paper:0}"></div>
-      <div class="field"><label>Ink Cost (₱/unit)</label><input id="pt_ink" type="number" step="any" value="${p?p.ink:0}"></div>
+      <div class="field"><label>Paper Cost (₱/unit)</label><input id="pt_paper" type="number" step="any" value="${p?p.paper:0}" oninput="updatePtCostPreview()"></div>
+      <div class="field"><label>Ink Cost (₱/unit)</label><input id="pt_ink" type="number" step="any" value="${p?p.ink:0}" oninput="updatePtCostPreview()"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Operation Cost (₱/unit)</label><input id="pt_op" type="number" step="any" value="${p?p.op:0}"></div>
+      <div class="field"><label>Operation Cost (₱/unit)</label><input id="pt_op" type="number" step="any" value="${p?p.op:0}" oninput="updatePtCostPreview()"></div>
       <div class="field"><label>Est. Minutes/unit</label><input id="pt_minutes" type="number" step="any" value="${p?p.minutes:0.3}"></div>
     </div>
+    <div class="card" style="background:var(--green-dim); border-color:var(--green); margin:4px 0 16px; padding:10px 14px;">
+      <div class="stat-label">Cost to Make (per unit)</div>
+      <div class="stat-value green" id="ptCostToMake" style="font-size:22px;">₱0</div>
+    </div>
+    <div class="cost-section-head"><h3 style="font-size:13px;">Custom Details</h3><button class="icon-btn" onclick="addPtCustomField()">➕</button></div>
+    <div id="ptCustomFieldsList"></div>
     <div class="modal-actions">
       ${p?`<button class="btn danger" onclick="deleteProductTemplate('${p.id}', true)">Delete</button>`:''}
       <button class="btn secondary" onclick="closeModal()">Cancel</button>
       <button class="btn" onclick="saveProductTemplate(${p?`'${p.id}'`:'null'})">Save</button>
     </div>`;
+  renderPtCustomFields();
+  updatePtCostPreview();
   openModal();
 }
 function saveProductTemplate(id){
@@ -3949,6 +4000,8 @@ function saveProductTemplate(id){
     ink: Number(document.getElementById('pt_ink').value)||0,
     op: Number(document.getElementById('pt_op').value)||0,
     minutes: Number(document.getElementById('pt_minutes').value)||0,
+    image: productImageDraft,
+    customFields: ptCustomFieldsDraft.filter(f=>f.label.trim()),
   };
   if(id){ const p = state.printProducts.find(x=>x.id===id); Object.assign(p, payload); }
   else { state.printProducts.push({ id: uid(), ...payload }); }
