@@ -1237,6 +1237,7 @@ let state = {
   hqBlocks: storageGet('am_hq_blocks', null),
   partyBookings: storageGet('am_party_bookings', []),
   partyColors: storageGet('am_party_colors', null),
+  restockCategories: storageGet('am_restock_categories', null),
   pnRentals: storageGet('am_pn_rentals', null),
   research: storageGet('am_research', null),
   navOrder: storageGet('am_nav_order', []),
@@ -1444,6 +1445,11 @@ if(state.partyInventory === null){
 if(state.partyColors === null){
   state.partyColors = ['White','Black','Red','Blue','Gold'];
 }
+if(state.restockCategories === null){
+  const used = [...new Set(state.restock.map(r=>r.category).filter(Boolean))];
+  const defaults = ['Food','ToysCandies','Others','Printing Supplies','Party Rentals'];
+  state.restockCategories = [...new Set([...defaults, ...used])];
+}
 if(state.pnRentals === null){
   state.pnRentals = [
     { id: uid(), category:'Karaoke', name:'Traditional Karaoke Rental', pax:null, price:0, unit:'per event', inclusions:'Karaoke machine + 2 mics + speaker', notes:'Set your real rate — not yet priced' },
@@ -1523,6 +1529,7 @@ function persistLocalOnly(){
   storageSet('am_hq_blocks', state.hqBlocks);
   storageSet('am_party_bookings', state.partyBookings);
   storageSet('am_party_colors', state.partyColors);
+  storageSet('am_restock_categories', state.restockCategories);
   storageSet('am_pn_rentals', state.pnRentals);
   storageSet('am_research', state.research);
   storageSet('am_nav_order', state.navOrder);
@@ -2897,13 +2904,17 @@ function toggleRestockShow(id, val){
 function openRestockModal(id){
   const r = id ? state.restock.find(x=>x.id===id) : null;
   const options = state.products.map(p=>`<option value="${p.id}" data-name="${escapeHtml(p.name)}" data-cat="${p.category}">${escapeHtml(p.name)} (${p.id})</option>`).join('');
-  const existingCats = [...new Set(state.restock.map(x=>x.category).filter(Boolean))];
   document.getElementById('modalBody').innerHTML = `
     <h3>${r?'Edit':'Add to'} Restock Plan</h3>
     <div class="field"><label>Link to product (optional)</label><select id="r_product" onchange="onRestockProductChange()"><option value="">— manual entry —</option>${options}</select></div>
     <div class="field"><label>Product Name</label><input id="r_name" value="${r?escapeHtml(r.product_name):''}"></div>
-    <div class="field"><label>Category</label><input id="r_category" list="r_categoryList" value="${r?escapeHtml(r.category||''):''}" placeholder="Type any category — yours to name"></div>
-    <datalist id="r_categoryList">${existingCats.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
+    <div class="field">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label style="margin-bottom:0;">Category</label>
+        <button class="icon-btn" style="font-size:11px; color:var(--amber);" onclick="addRestockCategory()">+ Add Category</button>
+      </div>
+      <select id="r_category"></select>
+    </div>
     <div class="field-row">
       <div class="field"><label>Pcs per Pack</label><input id="r_pcs" type="number" step="any" value="${r&&r.pcs_per_pack?r.pcs_per_pack:''}"></div>
       <div class="field"><label>Cost Price</label><input id="r_cost" type="number" step="any" value="${r?r.cost_price:''}"></div>
@@ -2917,12 +2928,32 @@ function openRestockModal(id){
       <button class="btn secondary" onclick="closeModal()">Cancel</button>
       <button class="btn" onclick="saveRestock(${r?`'${r.id}'`:'null'})">Save</button>
     </div>`;
+  populateRestockCategorySelect(r ? r.category : null);
   openModal();
+}
+function populateRestockCategorySelect(selected){
+  const sel = document.getElementById('r_category');
+  if(!sel) return;
+  sel.innerHTML = state.restockCategories.map(c=>`<option value="${escapeHtml(c)}" ${selected===c?'selected':''}>${escapeHtml(c)}</option>`).join('');
+}
+function addRestockCategory(){
+  const name = prompt('New category name:');
+  if(!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if(!state.restockCategories.some(c=>c.toLowerCase()===trimmed.toLowerCase())){
+    state.restockCategories.push(trimmed);
+    saveAll();
+  }
+  populateRestockCategorySelect(trimmed);
+  toast('Category added');
 }
 function onRestockProductChange(){
   const sel=document.getElementById('r_product'); const opt=sel.options[sel.selectedIndex];
   document.getElementById('r_name').value = opt.dataset.name||'';
-  if(opt.dataset.cat) document.getElementById('r_category').value = opt.dataset.cat;
+  if(opt.dataset.cat){
+    if(!state.restockCategories.includes(opt.dataset.cat)){ state.restockCategories.push(opt.dataset.cat); saveAll(); }
+    populateRestockCategorySelect(opt.dataset.cat);
+  }
 }
 function saveRestock(id){
   const sel = document.getElementById('r_product'); const productId = sel.value||null;
@@ -2930,7 +2961,7 @@ function saveRestock(id){
   if(!name){ toast('Product name required'); return; }
   const payload = {
     product_id: productId, product_name: name,
-    category: document.getElementById('r_category').value.trim() || 'Uncategorized',
+    category: document.getElementById('r_category').value || 'Uncategorized',
     pcs_per_pack: Number(document.getElementById('r_pcs').value)||null,
     cost_price: Number(document.getElementById('r_cost').value)||0,
     sell_price: Number(document.getElementById('r_price').value)||0,
