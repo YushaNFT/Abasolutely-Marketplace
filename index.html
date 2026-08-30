@@ -1238,6 +1238,7 @@ let state = {
   partyBookings: storageGet('am_party_bookings', []),
   partyColors: storageGet('am_party_colors', null),
   restockCategories: storageGet('am_restock_categories', null),
+  printSupplyCategories: storageGet('am_print_supply_categories', null),
   pnRentals: storageGet('am_pn_rentals', null),
   research: storageGet('am_research', null),
   navOrder: storageGet('am_nav_order', []),
@@ -1450,6 +1451,11 @@ if(state.restockCategories === null){
   const defaults = ['Food','ToysCandies','Others','Printing Supplies','Party Rentals'];
   state.restockCategories = [...new Set([...defaults, ...used])];
 }
+if(state.printSupplyCategories === null){
+  const used = [...new Set(state.printSupplies.map(s=>s.category).filter(Boolean))];
+  const defaults = ['Packaging Materials','Papers & Cards','Tools & Accessories'];
+  state.printSupplyCategories = [...new Set([...defaults, ...used])];
+}
 if(state.pnRentals === null){
   state.pnRentals = [
     { id: uid(), category:'Karaoke', name:'Traditional Karaoke Rental', pax:null, price:0, unit:'per event', inclusions:'Karaoke machine + 2 mics + speaker', notes:'Set your real rate — not yet priced' },
@@ -1530,6 +1536,7 @@ function persistLocalOnly(){
   storageSet('am_party_bookings', state.partyBookings);
   storageSet('am_party_colors', state.partyColors);
   storageSet('am_restock_categories', state.restockCategories);
+  storageSet('am_print_supply_categories', state.printSupplyCategories);
   storageSet('am_pn_rentals', state.pnRentals);
   storageSet('am_research', state.research);
   storageSet('am_nav_order', state.navOrder);
@@ -4159,15 +4166,19 @@ document.getElementById('psTabs').addEventListener('click', e=>{
 });
 function renderPsCategoryTabs(){
   const tabsEl = document.getElementById('psTabs');
-  const categories = [...new Set(state.printSupplies.map(s=>s.category).filter(Boolean))];
+  const used = state.printSupplies.map(s=>s.category).filter(Boolean);
+  const categories = [...new Set([...state.printSupplyCategories, ...used])];
   tabsEl.innerHTML = `<div class="tab ${psActiveCategory==='All'?'active':''}" data-cat="All">All</div>` +
     categories.map(c=>`<div class="tab ${psActiveCategory===c?'active':''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)} <span onclick="event.stopPropagation(); renamePsCategory('${c.replace(/'/g,"\\'")}')" style="opacity:.6; margin-left:4px;" title="Rename category">✏️</span></div>`).join('');
 }
 function renamePsCategory(oldCat){
   const newCat = prompt('Rename category "'+oldCat+'" to:', oldCat);
   if(!newCat || !newCat.trim() || newCat.trim()===oldCat) return;
-  state.printSupplies.forEach(s=>{ if(s.category===oldCat) s.category = newCat.trim(); });
-  if(psActiveCategory===oldCat) psActiveCategory = newCat.trim();
+  const trimmed = newCat.trim();
+  state.printSupplies.forEach(s=>{ if(s.category===oldCat) s.category = trimmed; });
+  const idx = state.printSupplyCategories.indexOf(oldCat);
+  if(idx>-1) state.printSupplyCategories[idx] = trimmed; else state.printSupplyCategories.push(trimmed);
+  if(psActiveCategory===oldCat) psActiveCategory = trimmed;
   saveAll(); toast('Category renamed'); renderPrintSupplies();
 }
 function renderPrintSupplies(){
@@ -4229,15 +4240,19 @@ function openSupplyModal(id){
   const s = id ? state.printSupplies.find(x=>x.id===id) : null;
   supplyImageDraft = s ? s.image : null;
   supplyInfoLinesDraft = s && s.infoLines ? JSON.parse(JSON.stringify(s.infoLines)) : (s && s.description ? [{text:s.description, visible:true}] : []);
-  const categories = [...new Set(state.printSupplies.map(x=>x.category).filter(Boolean))];
   document.getElementById('modalBody').innerHTML = `
     <h3>${s?'Edit':'Add'} Supply</h3>
     <div class="field"><label>Product Name</label><input id="sp_name" value="${s?escapeHtml(s.name):''}" placeholder="e.g. RC Satin Photo Paper"></div>
     <div class="field-row">
-      <div class="field"><label>Category</label><input id="sp_category" list="sp_categoryList" value="${s?escapeHtml(s.category||''):''}" placeholder="Existing or new"></div>
+      <div class="field">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label style="margin-bottom:0;">Category</label>
+          <button class="icon-btn" style="font-size:11px; color:var(--amber);" onclick="addPsCategory()">+ Add Category</button>
+        </div>
+        <select id="sp_category"></select>
+      </div>
       <div class="field"><label>Price (₱)</label><input id="sp_price" type="number" step="any" value="${s&&s.price?s.price:''}"></div>
     </div>
-    <datalist id="sp_categoryList">${categories.map(c=>`<option value="${escapeHtml(c)}">`).join('')}</datalist>
     <div class="field">
       <label>Info Lines <span style="text-transform:none; font-weight:400;">— check the box to show it on the card</span></label>
       <div id="sp_infolines"></div>
@@ -4246,8 +4261,25 @@ function openSupplyModal(id){
     <div class="field"><label>Buy Link (URL)</label><input id="sp_link" value="${s?escapeHtml(s.link||''):''}" placeholder="https://..."></div>
     <div class="field"><label>Location / Store</label><input id="sp_location" value="${s?escapeHtml(s.location||''):''}" placeholder="e.g. Lazada — Yopsun Official Store"></div>
     <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveSupply(${s?`'${s.id}'`:'null'})">Save</button></div>`;
+  populatePsCategorySelect(s ? s.category : null);
   renderSupplyInfoLines();
   openModal();
+}
+function populatePsCategorySelect(selected){
+  const sel = document.getElementById('sp_category');
+  if(!sel) return;
+  sel.innerHTML = state.printSupplyCategories.map(c=>`<option value="${escapeHtml(c)}" ${selected===c?'selected':''}>${escapeHtml(c)}</option>`).join('');
+}
+function addPsCategory(){
+  const name = prompt('New category name:');
+  if(!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if(!state.printSupplyCategories.some(c=>c.toLowerCase()===trimmed.toLowerCase())){
+    state.printSupplyCategories.push(trimmed);
+    saveAll();
+  }
+  populatePsCategorySelect(trimmed);
+  toast('Category added');
 }
 function saveSupply(id){
   const name = document.getElementById('sp_name').value.trim();
