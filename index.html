@@ -457,7 +457,10 @@
     <div class="page" id="page-restock">
       <div class="page-head">
         <div><h1>Restock Planning</h1><div class="sub">Marking "Bought" adds stock back automatically</div></div>
-        <button class="btn" onclick="openRestockModal()">+ Add to Plan</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" onclick="openManageCategoriesModal(state.restockCategories, state.restock, 'category', renderRestock, '🗂 Manage Restock Categories')">⚙ Categories</button>
+          <button class="btn" onclick="openRestockModal()">+ Add to Plan</button>
+        </div>
       </div>
       <div class="card" style="margin-bottom:16px; display:flex; align-items:center; gap:10px;">
         <label style="display:flex; align-items:center; gap:6px; font-size:13px; text-transform:none; margin:0; cursor:pointer;">
@@ -1041,7 +1044,10 @@
     <div class="page" id="page-printrestock">
       <div class="page-head">
         <div><h1>Printing Restock</h1><div class="sub">Where to buy your printing supplies — with pricing, links and locations</div></div>
-        <button class="btn" onclick="openSupplyModal()">+ Add Supply</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" onclick="openManageCategoriesModal(state.printSupplyCategories, state.printSupplies, 'category', renderPrintSupplies, '🗂 Manage Supply Categories')">⚙ Categories</button>
+          <button class="btn" onclick="openSupplyModal()">+ Add Supply</button>
+        </div>
       </div>
       <div class="card" style="margin-bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <input id="psSearch" placeholder="Search supplies..." style="max-width:280px;" oninput="renderPrintSupplies()">
@@ -2943,6 +2949,79 @@ function populateRestockCategorySelect(selected){
   if(!sel) return;
   sel.innerHTML = state.restockCategories.map(c=>`<option value="${escapeHtml(c)}" ${selected===c?'selected':''}>${escapeHtml(c)}</option>`).join('');
 }
+/* ===================== MANAGE CATEGORIES (generic — reused across pages) ===================== */
+let mcContext = null;
+let mcSortable = null;
+function openManageCategoriesModal(categoriesArr, itemsArr, catField, rerenderFn, title){
+  mcContext = { categoriesArr, itemsArr, catField, rerenderFn };
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${title||'Manage Categories'}</h3>
+    <div class="flag-hint" style="margin-bottom:10px;">Drag ⠿ to reorder. Deleting moves its items to "Uncategorized" — nothing gets deleted.</div>
+    <div id="mcList"></div>
+    <div class="field-row" style="margin-top:10px;">
+      <input id="mcNewName" placeholder="New category name" onkeydown="if(event.key==='Enter'){mcAddCategory();}">
+      <button class="btn small secondary" onclick="mcAddCategory()">+ Add</button>
+    </div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Done</button></div>`;
+  renderMcList();
+  openModal();
+  initMcSortable();
+}
+function renderMcList(){
+  const wrap = document.getElementById('mcList');
+  if(!wrap || !mcContext) return;
+  const { categoriesArr, itemsArr, catField } = mcContext;
+  if(!categoriesArr.length){ wrap.innerHTML = `<div class="flag-hint">No categories yet — add one below.</div>`; return; }
+  wrap.innerHTML = categoriesArr.map(cat=>{
+    const count = itemsArr.filter(it=>it[catField]===cat).length;
+    const safeCat = escapeHtml(cat).replace(/'/g,"\\'");
+    return `<div class="hq-list-row" data-cat="${escapeHtml(cat)}">
+      <span class="mc-drag-handle" style="cursor:grab; color:var(--text-muted); flex-shrink:0;">⠿</span>
+      <input value="${escapeHtml(cat)}" onchange="mcRenameCategory('${safeCat}', this.value)">
+      <span class="badge gray" style="flex-shrink:0; white-space:nowrap;">${count}</span>
+      <button class="icon-btn" onclick="mcDeleteCategory('${safeCat}')">🗑️</button>
+    </div>`;
+  }).join('');
+}
+function initMcSortable(){
+  const el = document.getElementById('mcList');
+  if(mcSortable) mcSortable.destroy();
+  mcSortable = Sortable.create(el, {
+    animation:150, handle:'.mc-drag-handle',
+    onEnd: ()=>{
+      const order = [...el.children].map(c=>c.dataset.cat);
+      mcContext.categoriesArr.length = 0;
+      mcContext.categoriesArr.push(...order);
+      saveAll();
+      mcContext.rerenderFn();
+    }
+  });
+}
+function mcAddCategory(){
+  const input = document.getElementById('mcNewName');
+  const name = input.value.trim();
+  if(!name) return;
+  if(mcContext.categoriesArr.some(c=>c.toLowerCase()===name.toLowerCase())){ toast('Already exists'); return; }
+  mcContext.categoriesArr.push(name);
+  saveAll(); input.value=''; renderMcList(); initMcSortable(); mcContext.rerenderFn();
+}
+function mcRenameCategory(oldName, newNameRaw){
+  const newName = (newNameRaw||'').trim();
+  if(!newName || newName===oldName){ renderMcList(); return; }
+  const idx = mcContext.categoriesArr.indexOf(oldName);
+  if(idx>-1) mcContext.categoriesArr[idx] = newName;
+  mcContext.itemsArr.forEach(it=>{ if(it[mcContext.catField]===oldName) it[mcContext.catField] = newName; });
+  saveAll(); renderMcList(); initMcSortable(); mcContext.rerenderFn();
+}
+function mcDeleteCategory(cat){
+  if(!confirm(`Delete "${cat}"? Items using it move to "Uncategorized" instead of being deleted.`)) return;
+  const idx = mcContext.categoriesArr.indexOf(cat);
+  if(idx>-1) mcContext.categoriesArr.splice(idx,1);
+  mcContext.itemsArr.forEach(it=>{ if(it[mcContext.catField]===cat) it[mcContext.catField]='Uncategorized'; });
+  if(!mcContext.categoriesArr.includes('Uncategorized')) mcContext.categoriesArr.push('Uncategorized');
+  saveAll(); renderMcList(); initMcSortable(); mcContext.rerenderFn();
+}
+
 function addRestockCategory(){
   const name = prompt('New category name:');
   if(!name || !name.trim()) return;
